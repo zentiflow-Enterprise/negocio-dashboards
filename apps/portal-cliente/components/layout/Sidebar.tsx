@@ -39,7 +39,7 @@ const NAV_ITEMS = [
                 ),
             },
             {
-                href: "/citas/historial",
+                href: "/historial",
                 label: "Historial",
                 icon: (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
