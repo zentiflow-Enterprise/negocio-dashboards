@@ -257,6 +257,8 @@ function CitasOperativasPage() {
       fechaInicio = fecha.toISOString().split("T")[0] ?? null;
       query = query.gte("fecha", fechaInicio ?? "");
     }
+
+
     const { data } = await query.order("fecha", { ascending: true }).order("hora", { ascending: true });
 
     setCitas((data as Cita[]) || []);
@@ -267,7 +269,7 @@ function CitasOperativasPage() {
     if (!negocio?.id) return;
     loadCitas();
 
-    // Cargar profesionales y servicios activos
+    // Cargar profesionales y servicios activos carga
     supabase
       .from("profesionales")
       .select("id_profesional, nombre, activo")
