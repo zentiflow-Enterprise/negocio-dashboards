@@ -106,14 +106,14 @@ export default function Home() {
       // Draw edges
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
-          const dx = nodes[i].x - nodes[j].x;
-          const dy = nodes[i].y - nodes[j].y;
+          const dx = nodes[i]!.x - nodes[j]!.x;
+          const dy = nodes[i]!.y - nodes[j]!.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < CONNECT_DIST) {
             const a = (1 - dist / CONNECT_DIST) * 0.07;
             ctx.beginPath();
-            ctx.moveTo(nodes[i].x, nodes[i].y);
-            ctx.lineTo(nodes[j].x, nodes[j].y);
+            ctx.moveTo(nodes[i]!.x, nodes[i]!.y);
+            ctx.lineTo(nodes[j]!.x, nodes[j]!.y);
             ctx.strokeStyle = `rgba(56,132,255,${a})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
