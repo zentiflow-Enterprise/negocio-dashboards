@@ -75,12 +75,12 @@ export default function Home() {
       const candidates: number[] = [];
       for (let i = 0; i < nodes.length; i++) {
         if (i === from) continue;
-        const dx = nodes[from].x - nodes[i].x;
-        const dy = nodes[from].y - nodes[i].y;
+        const dx = nodes[from]!.x - nodes[i]!.x;
+        const dy = nodes[from]!.y - nodes[i]!.y;
         if (Math.sqrt(dx * dx + dy * dy) < CONNECT_DIST) candidates.push(i);
       }
       if (candidates.length === 0) return;
-      const to = candidates[Math.floor(Math.random() * candidates.length)];
+      const to = candidates[Math.floor(Math.random() * candidates.length)]!;
       signals.push({ fromIdx: from, toIdx: to, progress: 0, speed: 0.012 + Math.random() * 0.016, alpha: 1 });
     };
 
