@@ -124,18 +124,34 @@ export default function Home() {
       // Draw signals (traveling dots on edges)
       for (let s = signals.length - 1; s >= 0; s--) {
         const sig = signals[s];
+        if (!sig) continue; // 🔥 seguridad
+
         sig.progress += sig.speed;
-        if (sig.progress >= 1) {
-          nodes[sig.toIdx].active = true;
-          nodes[sig.toIdx].activeCooldown = 18;
+
+        const from = nodes[sig.fromIdx];
+        const to = nodes[sig.toIdx];
+
+        if (!from || !to) {
           signals.splice(s, 1);
           continue;
         }
-        const from = nodes[sig.fromIdx];
-        const to = nodes[sig.toIdx];
+
+        if (sig.progress >= 1) {
+          to.active = true;
+          to.activeCooldown = 18;
+          signals.splice(s, 1);
+          continue;
+        }
+
         const x = from.x + (to.x - from.x) * sig.progress;
         const y = from.y + (to.y - from.y) * sig.progress;
-        const fade = sig.progress < 0.1 ? sig.progress / 0.1 : sig.progress > 0.85 ? (1 - sig.progress) / 0.15 : 1;
+
+        const fade =
+          sig.progress < 0.1
+            ? sig.progress / 0.1
+            : sig.progress > 0.85
+              ? (1 - sig.progress) / 0.15
+              : 1;
 
         // Signal trail
         ctx.beginPath();
@@ -144,7 +160,12 @@ export default function Home() {
         grad.addColorStop(1, `rgba(56,132,255,${0.35 * fade})`);
         ctx.strokeStyle = grad;
         ctx.lineWidth = 1.2;
-        ctx.moveTo(from.x + (x - from.x) * Math.max(0, sig.progress - 0.18), from.y + (y - from.y) * Math.max(0, sig.progress - 0.18));
+
+        ctx.moveTo(
+          from.x + (x - from.x) * Math.max(0, sig.progress - 0.18),
+          from.y + (y - from.y) * Math.max(0, sig.progress - 0.18)
+        );
+
         ctx.lineTo(x, y);
         ctx.stroke();
 
