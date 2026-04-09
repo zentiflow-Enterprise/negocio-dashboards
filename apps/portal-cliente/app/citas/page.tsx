@@ -85,7 +85,7 @@ function formatHora(hora: string) {
   if (!hora) return "";
   const [hh, mm] = hora.split(":").map(Number);
   const date = new Date();
-  date.setHours(hh, mm);
+  date.setHours(hh ?? 0, mm ?? 0);
   return date.toLocaleTimeString("es-CR", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
