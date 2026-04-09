@@ -55,7 +55,7 @@ function formatHora(hora: string) {
   if (!hora) return "";
   const [hh, mm] = hora.split(":").map(Number);
   const date = new Date();
-  date.setHours(hh, mm);
+  date.setHours(hh ?? 0, mm ?? 0);
   return date.toLocaleTimeString("es-CR", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
@@ -63,11 +63,10 @@ function formatHora(hora: string) {
 function ActiveBadge({ activo }: { activo: boolean }) {
   return (
     <span
-      className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
-        activo
-          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-          : "bg-gray-500/10 text-gray-400 border-gray-400/20"
-      }`}
+      className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${activo
+        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+        : "bg-gray-500/10 text-gray-400 border-gray-400/20"
+        }`}
     >
       {activo ? "Activo" : "Inactivo"}
     </span>
@@ -100,11 +99,10 @@ function DiaChips({
             type="button"
             disabled={!interactive}
             onClick={() => toggle(key)}
-            className={`text-[10px] px-2 py-0.5 rounded-full font-medium border transition ${
-              activo
-                ? "border-transparent text-white"
-                : "bg-transparent text-[var(--text-soft)] border-[var(--border)]"
-            } ${interactive ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}
+            className={`text-[10px] px-2 py-0.5 rounded-full font-medium border transition ${activo
+              ? "border-transparent text-white"
+              : "bg-transparent text-[var(--text-soft)] border-[var(--border)]"
+              } ${interactive ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}
             style={activo ? { background: "var(--accent)", borderColor: "var(--accent)" } : {}}
           >
             {label}
@@ -145,8 +143,8 @@ function TurnoModal({
   // Calcular horas trabajadas
   const calcHoras = () => {
     try {
-      const [hE, mE] = form.hora_entrada.split(":").map(Number);
-      const [hS, mS] = form.hora_salida.split(":").map(Number);
+      const [hE = 0, mE = 0] = form.hora_entrada.split(":").map(Number);
+      const [hS = 0, mS = 0] = form.hora_salida.split(":").map(Number);
       const mins = hS * 60 + mS - (hE * 60 + mE);
       if (mins <= 0) return null;
       const h = Math.floor(mins / 60);
@@ -250,9 +248,8 @@ function TurnoModal({
             <button
               type="button"
               onClick={() => set("activo", !form.activo)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${
-                form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"
-              }`}
+              className={`relative w-11 h-6 rounded-full transition-colors ${form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"
+                }`}
             >
               <span
                 className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
@@ -446,24 +443,23 @@ function TurnosPage() {
                 // Calcular jornada
                 let jornada = "—";
                 try {
-                  const [hE, mE] = t.hora_entrada.split(":").map(Number);
-                  const [hS, mS] = t.hora_salida.split(":").map(Number);
+                  const [hE = 0, mE = 0] = t.hora_entrada.split(":").map(Number);
+                  const [hS = 0, mS = 0] = t.hora_salida.split(":").map(Number);
                   const mins = hS * 60 + mS - (hE * 60 + mE);
                   if (mins > 0) {
                     const h = Math.floor(mins / 60);
                     const m = mins % 60;
                     jornada = m > 0 ? `${h}h ${m}min` : `${h}h`;
                   }
-                } catch {}
+                } catch { }
 
                 const diaLibreLabel = DIAS_SEMANA.find((d) => d.key === t.dia_libre)?.label;
 
                 return (
                   <tr
                     key={t.id_turno}
-                    className={`border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg)] transition ${
-                      i % 2 === 0 ? "" : "bg-[var(--bg)]/30"
-                    }`}
+                    className={`border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg)] transition ${i % 2 === 0 ? "" : "bg-[var(--bg)]/30"
+                      }`}
                   >
                     <td className="px-4 py-3 font-medium">{t.nombre_turno}</td>
                     <td className="px-4 py-3 text-[var(--text-soft)]">
