@@ -4,40 +4,27 @@ import { useNegocio } from "@/lib/hooks/useNegocio";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { MobileMenu } from "@/components/layout/MobileMenu";
 import { useEffect, useState } from "react";
+import { Toaster } from "react-hot-toast";
 
 export default function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const { negocio, loading } = useNegocio();
+    const { negocio } = useNegocio();
 
     const [theme, setTheme] = useState<"dark" | "light">("dark");
 
-    // ═══════════════════════════════════════
-    // 🎨 BRANDING DINÁMICO
-    // ═══════════════════════════════════════
     useEffect(() => {
         if (!negocio) return;
-
-        // color principal
-        document.documentElement.style.setProperty(
-            "--accent",
-            negocio.neg_color_acento || "#c9a96e"
-        );
-
-        // título dinámico
-        document.title = `Portal · ${negocio.neg_nombre || "Cliente"
-            }`;
+        document.documentElement.style.setProperty("--accent", negocio.neg_color_acento || "#c9a96e");
+        document.title = `Portal · ${negocio.neg_nombre || "Cliente"}`;
     }, [negocio]);
 
-    // ═══════════════════════════════════════
-    // 🌙 INIT THEME (persistente)
-    // ═══════════════════════════════════════
     useEffect(() => {
         const saved = localStorage.getItem("theme");
-
         if (saved === "light") {
             document.documentElement.classList.remove("dark");
             setTheme("light");
@@ -47,12 +34,8 @@ export default function DashboardLayout({
         }
     }, []);
 
-    // ═══════════════════════════════════════
-    // 🔥 TOGGLE THEME
-    // ═══════════════════════════════════════
     const toggleTheme = () => {
         const html = document.documentElement;
-
         if (html.classList.contains("dark")) {
             html.classList.remove("dark");
             localStorage.setItem("theme", "light");
@@ -64,33 +47,33 @@ export default function DashboardLayout({
         }
     };
 
-    // ═══════════════════════════════════════
-    // UI
-    // ═══════════════════════════════════════
     return (
-        <div className="flex h-screen bg-[var(--bg)] text-[var(--text)] transition-all">
+        <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
 
-            {/* SIDEBAR */}
+            {/* SIDEBAR - Solo visible en desktop */}
             <Sidebar negocio={negocio} />
 
-            <div className="flex-1 flex flex-col">
+            {/* Área de Contenido */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-                {/* TOPBAR */}
                 <Topbar
                     negocio={negocio}
                     theme={theme}
                     toggleTheme={toggleTheme}
                 />
 
-                {/* MAIN */}
-                <main className="flex-1 p-6 overflow-y-auto fade-in">
+                <main className="flex-1 p-6 lg:p-8 overflow-y-auto pb-20 md:pb-8">
                     {children}
                 </main>
 
-                {/* MOBILE NAV */}
+                {/* Navbar inferior solo en móvil */}
                 <MobileNav />
-
             </div>
+
+            {/* Menú Hamburguesa Móvil */}
+            <MobileMenu negocio={negocio} />
+
+            <Toaster position="top-center" />
         </div>
     );
 }

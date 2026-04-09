@@ -25,20 +25,32 @@ export function Topbar({
 
     const nombre = negocio?.nombre || "Mi negocio";
     const ciudad = negocio?.ciudad || "";
+    console.log("neg_logo_url:", negocio?.neg_logo_url);
+    console.log("negocio completo:", negocio);
 
     return (
         <div className="h-16 border-b border-[var(--border)] flex items-center justify-between px-6 bg-[var(--bg)] transition-all">
 
             {/* ═════════════════ LEFT ═════════════════ */}
-            <div className="flex flex-col">
-                <div className="font-semibold text-sm md:text-base">
-                    {nombre}
-                </div>
-                <div className="text-xs text-[var(--text-soft)]">
-                    {ciudad || "Portal cliente"}
+            <div className="flex items-center gap-3 pl-14 md:pl-0">
+
+                {negocio?.logo && (
+                    <img
+                        src={negocio.logo}
+                        className="w-12 h-12 rounded-xl object-cover border border-[var(--border)] md:hidden"
+                        alt={nombre}
+                    />
+                )}
+
+                <div className="flex flex-col">
+                    <div className="font-semibold text-sm md:text-base">
+                        {nombre}
+                    </div>
+                    <div className="text-xs text-[var(--text-soft)]">
+                        {ciudad || "Portal cliente"}
+                    </div>
                 </div>
             </div>
-
             {/* ═════════════════ RIGHT ═════════════════ */}
             <div className="flex items-center gap-3">
 
