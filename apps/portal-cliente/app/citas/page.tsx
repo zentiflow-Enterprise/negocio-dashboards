@@ -241,8 +241,7 @@ function CitasOperativasPage() {
       .select("*")
       .eq("negocio_id", negocio.id);
 
-    // Filtro por período
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = new Date().toISOString().split("T")[0] ?? "";
     let fechaInicio: string | null = null;
 
     if (filtroFecha === "hoy") {
@@ -250,15 +249,14 @@ function CitasOperativasPage() {
     } else if (filtroFecha === "semana") {
       const fecha = new Date();
       fecha.setDate(fecha.getDate() - 7);
-      fechaInicio = fecha.toISOString().split("T")[0];
-      query = query.gte("fecha", fechaInicio);
+      fechaInicio = fecha.toISOString().split("T")[0] ?? null;
+      query = query.gte("fecha", fechaInicio ?? "");
     } else if (filtroFecha === "mes") {
       const fecha = new Date();
       fecha.setMonth(fecha.getMonth() - 1);
-      fechaInicio = fecha.toISOString().split("T")[0];
-      query = query.gte("fecha", fechaInicio);
+      fechaInicio = fecha.toISOString().split("T")[0] ?? null;
+      query = query.gte("fecha", fechaInicio ?? "");
     }
-
     const { data } = await query.order("fecha", { ascending: true }).order("hora", { ascending: true });
 
     setCitas((data as Cita[]) || []);
