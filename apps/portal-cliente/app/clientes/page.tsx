@@ -63,8 +63,8 @@ function EstadoBadge({ tieneCitaReciente }: { tieneCitaReciente: boolean }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 text-[10px] px-3 py-1 rounded-full font-medium border ${tieneCitaReciente
-          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-          : "bg-gray-500/10 text-gray-400 border-gray-400/20"
+        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+        : "bg-gray-500/10 text-gray-400 border-gray-400/20"
         }`}
     >
       <span className={`w-2 h-2 rounded-full ${tieneCitaReciente ? "bg-emerald-500" : "bg-gray-400"}`} />
@@ -407,8 +407,8 @@ function ClientesPage() {
                   <td className="px-4 py-3">
                     <span
                       className={`text-xs px-2.5 py-0.5 rounded-full border ${c.portal_habilitado
-                          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                          : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                        : "bg-amber-500/10 text-amber-500 border-amber-500/20"
                         }`}
                     >
                       {c.portal_habilitado ? "Habilitado" : "Deshabilitado"}
@@ -434,7 +434,14 @@ function ClientesPage() {
         onClose={() => { setModalOpen(false); setEditando(null); }}
         onSave={handleSave}
         onDelete={handleDelete}
-        inicial={editando || undefined}
+        inicial={editando ? {
+          cliente_id: editando.cliente_id,
+          nombre: editando.nombre,
+          email: editando.email,
+          id_whatsapp: editando.id_whatsapp ?? undefined,
+          origen: editando.origen ?? undefined,
+          portal_habilitado: editando.portal_habilitado,
+        } : undefined}
         loading={saving}
       />
     </div>
