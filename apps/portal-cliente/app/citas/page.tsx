@@ -12,9 +12,6 @@ interface Cita {
   nombre_cliente: string;
   nombre_profesional: string;
   nombre_servicio: string;
-  id_profesional: string;
-  id_servicio: string;
-  id_cliente: string;
   fecha: string;
   hora: string;
   precio: number;
@@ -55,7 +52,6 @@ const FORM_EMPTY: CitaForm = {
   notas: "",
 };
 
-// Colores por estado (como solicitaste)
 const ESTADO_COLOR: Record<string, string> = {
   Agendada: "bg-blue-500/10 text-blue-600 border-blue-500/30",
   Reprogramada: "bg-amber-500/10 text-amber-600 border-amber-500/30",
@@ -89,7 +85,90 @@ function formatHora(hora: string) {
   return date.toLocaleTimeString("es-CR", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
+// ─── Tarjeta de Cita - Versión mejorada con Cliente primero ───────────────────
+function CitaCard({
+  cita,
+  onReprogramar,
+  onCancelar,
+  onFinalizar,
+}: {
+  cita: Cita;
+  onReprogramar: (c: Cita) => void;
+  onCancelar: (id: string) => void;
+  onFinalizar: (id: string) => void;
+}) {
+  return (
+    <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl flex flex-col p-4 hover:border-[var(--accent)]/40 transition-all duration-150 h-full">
+
+      {/* Header: Cliente + Estado */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">CLIENTE</p>
+          <p className="font-semibold text-lg leading-tight truncate">{cita.nombre_cliente}</p>
+        </div>
+        <EstadoBadge estado={cita.estado} />
+      </div>
+
+      {/* Fecha y Hora */}
+      <div className="mb-4">
+        <p className="text-lg font-medium">{formatFecha(cita.fecha)}</p>
+        <p className="text-2xl font-bold text-[var(--accent)] tracking-tighter">{formatHora(cita.hora)}</p>
+      </div>
+
+      {/* Servicio y Profesional */}
+      <div className="grid grid-cols-2 gap-4 mb-5">
+        <div>
+          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">SERVICIO</p>
+          <p className="text-sm font-medium leading-tight">{cita.nombre_servicio}</p>
+          <p className="text-xs text-[var(--text-soft)] mt-0.5">
+            {cita.duracion_min} min • ₡{Number(cita.precio).toLocaleString("es-CR")}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">PROFESIONAL</p>
+          <p className="text-sm leading-tight">{cita.nombre_profesional}</p>
+        </div>
+      </div>
+
+      {/* Notas (opcional) */}
+      {cita.notas && (
+        <div className="mb-4 p-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-soft)]">
+          {cita.notas}
+        </div>
+      )}
+
+      {/* Acciones */}
+      <div className="mt-auto pt-4 border-t border-[var(--border)] flex flex-wrap gap-2">
+        <button
+          onClick={() => onReprogramar(cita)}
+          className="flex-1 px-4 py-2.5 text-xs font-medium border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 rounded-lg transition"
+        >
+          Reprogramar
+        </button>
+
+        {cita.estado !== "Cancelada" && cita.estado !== "Finalizada" && (
+          <button
+            onClick={() => onCancelar(cita.id_cita)}
+            className="flex-1 px-4 py-2.5 text-xs font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg transition"
+          >
+            Cancelar
+          </button>
+        )}
+
+        {cita.estado !== "Finalizada" && cita.estado !== "Cancelada" && (
+          <button
+            onClick={() => onFinalizar(cita.id_cita)}
+            className="flex-1 px-4 py-2.5 text-xs font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition"
+          >
+            Finalizar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal (sin cambios) ──────────────────────────────────────────────────────
 function CitaModal({
   open,
   onClose,
@@ -120,13 +199,21 @@ function CitaModal({
   const servSel = servicios.find((s) => s.id_servicio === form.id_servicio);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
         <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
           <h2 className="font-medium text-base">
             {inicial?.id_cita ? "Reprogramar cita" : "Nueva cita"}
           </h2>
-          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]">✕</button>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="p-5 flex flex-col gap-4">
@@ -178,11 +265,21 @@ function CitaModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-[var(--text-soft)] mb-1 block">Fecha</label>
-              <input type="date" className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.fecha} onChange={(e) => set("fecha", e.target.value)} />
+              <input
+                type="date"
+                className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
+                value={form.fecha}
+                onChange={(e) => set("fecha", e.target.value)}
+              />
             </div>
             <div>
               <label className="text-xs text-[var(--text-soft)] mb-1 block">Hora</label>
-              <input type="time" className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.hora} onChange={(e) => set("hora", e.target.value)} />
+              <input
+                type="time"
+                className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
+                value={form.hora}
+                onChange={(e) => set("hora", e.target.value)}
+              />
             </div>
           </div>
 
@@ -199,7 +296,12 @@ function CitaModal({
         </div>
 
         <div className="flex gap-2 p-5 border-t border-[var(--border)]">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--bg-soft)] transition">Cancelar</button>
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--bg-soft)] transition"
+          >
+            Cancelar
+          </button>
           <button
             onClick={() => onSave(form, inicial?.id_cita)}
             disabled={loading || !form.nombre_cliente || !form.id_profesional || !form.id_servicio || !form.fecha || !form.hora}
@@ -214,7 +316,7 @@ function CitaModal({
   );
 }
 
-// ─── Página Principal ─────────────────────────────────────────────────────────
+// ─── Página principal ─────────────────────────────────────────────────────────
 function CitasOperativasPage() {
   const supabase = createClient();
   const { negocio } = useNegocio();
@@ -242,24 +344,23 @@ function CitasOperativasPage() {
       .eq("negocio_id", negocio.id);
 
     const hoy = new Date().toISOString().split("T")[0] ?? "";
-    let fechaInicio: string | null = null;
 
     if (filtroFecha === "hoy") {
       query = query.eq("fecha", hoy);
     } else if (filtroFecha === "semana") {
       const fecha = new Date();
       fecha.setDate(fecha.getDate() - 7);
-      fechaInicio = fecha.toISOString().split("T")[0] ?? null;
-      query = query.gte("fecha", fechaInicio ?? "");
+      query = query.gte("fecha", fecha.toISOString().split("T")[0] ?? "");
     } else if (filtroFecha === "mes") {
       const fecha = new Date();
       fecha.setMonth(fecha.getMonth() - 1);
-      fechaInicio = fecha.toISOString().split("T")[0] ?? null;
-      query = query.gte("fecha", fechaInicio ?? "");
+      query = query.gte("fecha", fecha.toISOString().split("T")[0] ?? "");
     }
 
-
-    const { data } = await query.order("fecha", { ascending: true }).order("hora", { ascending: true });
+    // ←←← AQUÍ ESTÁ EL CAMBIO IMPORTANTE
+    const { data } = await query
+      .order("fecha", { ascending: true })   // primero las fechas más cercanas
+      .order("hora", { ascending: true });   // dentro del día, las horas más tempranas primero
 
     setCitas((data as Cita[]) || []);
     setLoading(false);
@@ -269,7 +370,6 @@ function CitasOperativasPage() {
     if (!negocio?.id) return;
     loadCitas();
 
-    // Cargar profesionales y servicios activos carga
     supabase
       .from("profesionales")
       .select("id_profesional, nombre, activo")
@@ -301,7 +401,7 @@ function CitasOperativasPage() {
       setModalOpen(false);
       setEditando(null);
       loadCitas();
-    } catch (e) {
+    } catch {
       toast.error("Error al guardar ❌");
     } finally {
       setSaving(false);
@@ -331,7 +431,8 @@ function CitasOperativasPage() {
   };
 
   const citasFiltradas = citas.filter((c) => {
-    const matchBusq = !busqueda ||
+    const matchBusq =
+      !busqueda ||
       c.nombre_cliente.toLowerCase().includes(busqueda.toLowerCase()) ||
       c.nombre_servicio.toLowerCase().includes(busqueda.toLowerCase());
 
@@ -350,16 +451,17 @@ function CitasOperativasPage() {
         </div>
         <button
           onClick={() => { setEditando(null); setModalOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[var(--accent)] hover:opacity-90 transition"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white hover:opacity-90 transition"
+          style={{ background: "var(--accent)" }}
         >
           <span className="text-base leading-none">+</span> Nueva cita
         </button>
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <input
-          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] w-72"
+          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] flex-1"
           placeholder="Buscar cliente o servicio..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
@@ -388,73 +490,29 @@ function CitasOperativasPage() {
         </select>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl overflow-x-auto">
-        {loading ? (
-          <div className="py-16 text-center text-[var(--text-soft)]">Cargando citas...</div>
-        ) : citasFiltradas.length === 0 ? (
-          <div className="py-16 text-center">
-            <span className="text-3xl block mb-2">📅</span>
-            <p className="text-[var(--text-soft)]">No hay citas para los filtros seleccionados</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-[var(--bg)]">
-              <tr className="border-b border-[var(--border)]">
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase">Fecha</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase">Hora</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase">Cliente</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase">Servicio</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase">Profesional</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase">Estado</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {citasFiltradas.map((c, i) => (
-                <tr key={c.id_cita} className={`border-b border-[var(--border)] hover:bg-[var(--bg)] transition ${i % 2 === 1 ? "bg-[var(--bg)]/30" : ""}`}>
-                  <td className="px-4 py-3 font-medium">{formatFecha(c.fecha)}</td>
-                  <td className="px-4 py-3">{formatHora(c.hora)}</td>
-                  <td className="px-4 py-3 font-medium">{c.nombre_cliente}</td>
-                  <td className="px-4 py-3 text-[var(--text-soft)]">{c.nombre_servicio}</td>
-                  <td className="px-4 py-3 text-[var(--text-soft)]">{c.nombre_profesional}</td>
-                  <td className="px-4 py-3">
-                    <EstadoBadge estado={c.estado} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => { setEditando(c); setModalOpen(true); }}
-                        className="px-3 py-1 text-xs border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition"
-                      >
-                        Reprogramar
-                      </button>
-
-                      {c.estado !== "Cancelada" && c.estado !== "Finalizada" && (
-                        <button
-                          onClick={() => handleCancelar(c.id_cita)}
-                          className="px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-                        >
-                          Cancelar
-                        </button>
-                      )}
-
-                      {c.estado !== "Finalizada" && c.estado !== "Cancelada" && (
-                        <button
-                          onClick={() => handleFinalizar(c.id_cita)}
-                          className="px-3 py-1 text-xs bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition"
-                        >
-                          Finalizar
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Tarjetas de Citas */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-[var(--text-soft)] text-sm">
+          Cargando citas...
+        </div>
+      ) : citasFiltradas.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl">
+          <span className="text-5xl opacity-30">📅</span>
+          <p className="text-sm text-[var(--text-soft)]">No hay citas para los filtros seleccionados</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {citasFiltradas.map((cita) => (
+            <CitaCard
+              key={cita.id_cita}
+              cita={cita}
+              onReprogramar={(c) => { setEditando(c); setModalOpen(true); }}
+              onCancelar={handleCancelar}
+              onFinalizar={handleFinalizar}
+            />
+          ))}
+        </div>
+      )}
 
       <CitaModal
         open={modalOpen}

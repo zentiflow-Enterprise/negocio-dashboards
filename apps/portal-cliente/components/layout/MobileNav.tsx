@@ -33,7 +33,7 @@ export function MobileNav() {
                     <span className="text-[10px] mt-1 font-medium">Citas</span>
                 </Link>
 
-                <Link href="/citas/historial" className={`flex flex-col items-center py-2 px-3 transition-all ${isActive("/citas/historial") ? "text-[var(--accent)]" : "text-[var(--text-soft)]"}`}>
+                <Link href="/historial" className={`flex flex-col items-center py-2 px-3 transition-all ${isActive("/historial") ? "text-[var(--accent)]" : "text-[var(--text-soft)]"}`}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 8v4l3 3" />
                         <circle cx="12" cy="12" r="10" />

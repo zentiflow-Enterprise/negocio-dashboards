@@ -59,21 +59,23 @@ function formatHora(hora: string) {
   return date.toLocaleTimeString("es-CR", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
-// ─── Badge activo ─────────────────────────────────────────────────────────────
+// ─── Componentes reutilizables ────────────────────────────────────────────────
 function ActiveBadge({ activo }: { activo: boolean }) {
   return (
     <span
-      className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${activo
-        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-        : "bg-gray-500/10 text-gray-400 border-gray-400/20"
-        }`}
+      className={[
+        "inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full font-medium border",
+        activo
+          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+          : "bg-gray-500/10 text-gray-400 border-gray-400/20",
+      ].join(" ")}
     >
+      <span className={`w-1.5 h-1.5 rounded-full ${activo ? "bg-emerald-500" : "bg-gray-400"}`} />
       {activo ? "Activo" : "Inactivo"}
     </span>
   );
 }
 
-// ─── Chips de días ────────────────────────────────────────────────────────────
 function DiaChips({
   dias,
   interactive = false,
@@ -83,37 +85,115 @@ function DiaChips({
   interactive?: boolean;
   onChange?: (dias: string[]) => void;
 }) {
-  const toggle = (key: string) => {
+  const toggleDia = (key: string) => {
     if (!onChange) return;
-    const next = dias.includes(key) ? dias.filter((d) => d !== key) : [...dias, key];
-    onChange(next);
+    const nuevosDias = dias.includes(key)
+      ? dias.filter((d) => d !== key)           // quita el día
+      : [...dias, key];                         // agrega el día
+    onChange(nuevosDias);
   };
 
   return (
     <div className="flex gap-1 flex-wrap">
       {DIAS_SEMANA.map(({ key, label }) => {
         const activo = dias.includes(key);
-        return (
+
+        return interactive ? (
           <button
             key={key}
             type="button"
-            disabled={!interactive}
-            onClick={() => toggle(key)}
-            className={`text-[10px] px-2 py-0.5 rounded-full font-medium border transition ${activo
-              ? "border-transparent text-white"
-              : "bg-transparent text-[var(--text-soft)] border-[var(--border)]"
-              } ${interactive ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}
-            style={activo ? { background: "var(--accent)", borderColor: "var(--accent)" } : {}}
+            onClick={() => toggleDia(key)}
+            className={`text-[10px] px-3 py-1 rounded-full font-medium border transition-all active:scale-95 ${activo
+                ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                : "bg-transparent text-[var(--text-soft)] border-[var(--border)] hover:border-[var(--accent)]/50"
+              }`}
           >
             {label}
           </button>
+        ) : (
+          <span
+            key={key}
+            className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${activo
+                ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                : "bg-transparent text-[var(--text-soft)] border-[var(--border)]"
+              }`}
+          >
+            {label}
+          </span>
         );
       })}
     </div>
   );
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
+// ─── Tarjeta de Turno (compacta) ──────────────────────────────────────────────
+function TurnoCard({
+  turno,
+  onEdit,
+}: {
+  turno: Turno;
+  onEdit: (t: Turno) => void;
+}) {
+  // Calcular jornada
+  let jornada = "—";
+  try {
+    const [hE = 0, mE = 0] = turno.hora_entrada.split(":").map(Number);
+    const [hS = 0, mS = 0] = turno.hora_salida.split(":").map(Number);
+    const mins = hS * 60 + mS - (hE * 60 + mE);
+    if (mins > 0) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      jornada = m > 0 ? `${h}h ${m}min` : `${h}h`;
+    }
+  } catch { }
+
+  const diaLibreLabel = DIAS_SEMANA.find((d) => d.key === turno.dia_libre)?.label;
+
+  return (
+    <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl flex flex-col gap-3 p-4 hover:border-[var(--accent)]/40 transition-all duration-150 h-full">
+      {/* Header: Nombre + Estado + Editar */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-base leading-tight truncate">{turno.nombre_turno}</p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <ActiveBadge activo={turno.activo} />
+          <button
+            onClick={() => onEdit(turno)}
+            className="px-2.5 py-1 rounded-lg text-[11px] border border-[var(--border)] hover:bg-[var(--bg-soft)] transition"
+          >
+            Editar
+          </button>
+        </div>
+      </div>
+
+      {/* Horario */}
+      <div className="border-t border-[var(--border)] pt-3">
+        <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-1">Horario</p>
+        <p className="text-lg font-medium text-[var(--accent)]">
+          {formatHora(turno.hora_entrada)} — {formatHora(turno.hora_salida)}
+        </p>
+        <p className="text-xs text-[var(--text-soft)]">Jornada: {jornada}</p>
+      </div>
+
+      {/* Días de trabajo */}
+      <div>
+        <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-1">Días de trabajo</p>
+        <DiaChips dias={turno.dias_trabajo || []} />
+      </div>
+
+      {/* Día libre */}
+      {turno.dia_libre && (
+        <div>
+          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">Día libre</p>
+          <p className="text-sm">{diaLibreLabel}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Modal (se mantiene igual) ────────────────────────────────────────────────
 function TurnoModal({
   open,
   onClose,
@@ -140,7 +220,6 @@ function TurnoModal({
   const set = (k: keyof TurnoForm, v: string | boolean | string[]) =>
     setForm((p) => ({ ...p, [k]: v }));
 
-  // Calcular horas trabajadas
   const calcHoras = () => {
     try {
       const [hE = 0, mE = 0] = form.hora_entrada.split(":").map(Number);
@@ -226,9 +305,7 @@ function TurnoModal({
           </div>
 
           <div>
-            <label className="text-xs text-[var(--text-soft)] mb-1 block">
-              Día libre (opcional)
-            </label>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">Día libre (opcional)</label>
             <select
               className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               value={form.dia_libre}
@@ -248,12 +325,10 @@ function TurnoModal({
             <button
               type="button"
               onClick={() => set("activo", !form.activo)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"
-                }`}
+              className={`relative w-11 h-6 rounded-full transition-colors ${form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}
             >
               <span
-                className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
-                style={{ transform: form.activo ? "translateX(20px)" : "translateX(2px)" }}
+                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.activo ? "translate-x-5.5" : ""}`}
               />
             </button>
           </div>
@@ -357,8 +432,7 @@ function TurnosPage() {
   };
 
   const filtrados = turnos.filter((t) => {
-    const matchBusq =
-      !busqueda || t.nombre_turno.toLowerCase().includes(busqueda.toLowerCase());
+    const matchBusq = !busqueda || t.nombre_turno.toLowerCase().includes(busqueda.toLowerCase());
     const matchActivo =
       filtroActivo === "todos" ||
       (filtroActivo === "activo" && t.activo) ||
@@ -380,21 +454,23 @@ function TurnosPage() {
         </div>
         <button
           onClick={() => { setEditando(null); setModalOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[var(--accent)] hover:opacity-90 transition"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white hover:opacity-90 transition"
+          style={{ background: "var(--accent)" }}
         >
           <span className="text-base leading-none">+</span>
           Nuevo turno
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-2 items-center">
+      {/* Controles */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
         <input
-          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] w-48"
-          placeholder="Buscar turno..."
+          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] w-full sm:w-72"
+          placeholder="Buscar por nombre del turno..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
+
         <select
           className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
           value={filtroActivo}
@@ -404,92 +480,41 @@ function TurnosPage() {
           <option value="activo">Activos</option>
           <option value="inactivo">Inactivos</option>
         </select>
+
+        <span className="text-xs text-[var(--text-soft)] ml-auto whitespace-nowrap">
+          {filtrados.length} resultado{filtrados.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl overflow-x-auto">
-        {loading ? (
-          <div className="flex items-center justify-center py-16 text-[var(--text-soft)] text-sm">
-            Cargando...
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <span className="text-3xl">🕐</span>
-            <p className="text-sm text-[var(--text-soft)]">No hay turnos registrados</p>
+      {/* Tarjetas */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-[var(--text-soft)] text-sm">
+          Cargando turnos...
+        </div>
+      ) : filtrados.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl">
+          <span className="text-4xl opacity-30">🕐</span>
+          <p className="text-sm text-[var(--text-soft)]">No se encontraron turnos</p>
+          {busqueda && (
             <button
-              onClick={() => { setEditando(null); setModalOpen(true); }}
-              className="text-sm mt-1 underline"
-              style={{ color: "var(--accent)" }}
+              onClick={() => setBusqueda("")}
+              className="text-xs text-[var(--accent)] hover:underline"
             >
-              Crear el primero
+              Limpiar búsqueda
             </button>
-          </div>
-        ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-[var(--bg)]">
-              <tr className="border-b border-[var(--border)]">
-                {["Nombre", "Horario", "Jornada", "Días", "Día libre", "Estado", "Acciones"].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase tracking-wide"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.map((t, i) => {
-                // Calcular jornada
-                let jornada = "—";
-                try {
-                  const [hE = 0, mE = 0] = t.hora_entrada.split(":").map(Number);
-                  const [hS = 0, mS = 0] = t.hora_salida.split(":").map(Number);
-                  const mins = hS * 60 + mS - (hE * 60 + mE);
-                  if (mins > 0) {
-                    const h = Math.floor(mins / 60);
-                    const m = mins % 60;
-                    jornada = m > 0 ? `${h}h ${m}min` : `${h}h`;
-                  }
-                } catch { }
-
-                const diaLibreLabel = DIAS_SEMANA.find((d) => d.key === t.dia_libre)?.label;
-
-                return (
-                  <tr
-                    key={t.id_turno}
-                    className={`border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg)] transition ${i % 2 === 0 ? "" : "bg-[var(--bg)]/30"
-                      }`}
-                  >
-                    <td className="px-4 py-3 font-medium">{t.nombre_turno}</td>
-                    <td className="px-4 py-3 text-[var(--text-soft)]">
-                      {formatHora(t.hora_entrada)} – {formatHora(t.hora_salida)}
-                    </td>
-                    <td className="px-4 py-3 text-[var(--text-soft)]">{jornada}</td>
-                    <td className="px-4 py-3">
-                      <DiaChips dias={t.dias_trabajo || []} />
-                    </td>
-                    <td className="px-4 py-3 text-[var(--text-soft)]">
-                      {diaLibreLabel || "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <ActiveBadge activo={t.activo} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => { setEditando(t); setModalOpen(true); }}
-                        className="px-3 py-1 rounded-lg text-xs border border-[var(--border)] hover:bg-[var(--bg)] transition"
-                      >
-                        Editar
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtrados.map((t) => (
+            <TurnoCard
+              key={t.id_turno}
+              turno={t}
+              onEdit={(t) => { setEditando(t); setModalOpen(true); }}
+            />
+          ))}
+        </div>
+      )}
 
       <TurnoModal
         open={modalOpen}

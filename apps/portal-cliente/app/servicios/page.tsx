@@ -46,32 +46,83 @@ function genId() {
   return "srv_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
-// ─── Color dot ────────────────────────────────────────────────────────────────
+// ─── Componentes ──────────────────────────────────────────────────────────────
 function ColorDot({ color }: { color: string }) {
   return (
     <span
-      className="inline-block w-3 h-3 rounded-full border border-white/20"
+      className="inline-block w-3 h-3 rounded-full border border-white/20 flex-shrink-0"
       style={{ background: color || "#888" }}
     />
   );
 }
 
-// ─── Badge activo ─────────────────────────────────────────────────────────────
 function ActiveBadge({ activo }: { activo: boolean }) {
   return (
     <span
-      className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
+      className={[
+        "inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full font-medium border",
         activo
-          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-          : "bg-gray-500/10 text-gray-400 border-gray-400/20"
-      }`}
+          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+          : "bg-gray-500/10 text-gray-400 border-gray-400/20",
+      ].join(" ")}
     >
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${activo ? "bg-emerald-500" : "bg-gray-400"}`}
+      />
       {activo ? "Activo" : "Inactivo"}
     </span>
   );
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
+// ─── Tarjeta de Servicio (versión compacta) ───────────────────────────────────
+function ServicioCard({
+  servicio,
+  onEdit,
+}: {
+  servicio: Servicio;
+  onEdit: (s: Servicio) => void;
+}) {
+  return (
+    <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl flex flex-col gap-3 p-4 hover:border-[var(--accent)]/40 transition-all duration-150 h-full">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <ColorDot color={servicio.color_hex} />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm leading-tight truncate">{servicio.nombre}</p>
+            <p className="text-[11px] text-[var(--text-soft)] mt-0.5">
+              {servicio.duracion_min} min • ₡{Number(servicio.precio).toLocaleString("es-CR")}
+            </p>
+          </div>
+        </div>
+
+        {/* Estado y botón Editar en la misma línea */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <ActiveBadge activo={servicio.activo} />
+          <button
+            onClick={() => onEdit(servicio)}
+            className="px-2.5 py-1 rounded-lg text-[11px] border border-[var(--border)] hover:bg-[var(--bg-soft)] transition whitespace-nowrap"
+          >
+            Editar
+          </button>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-[var(--border)]" />
+
+      {/* Descripción */}
+      <div className="flex-1">
+        <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-1">Descripción</p>
+        <p className="text-xs text-[var(--text-soft)] line-clamp-2 leading-relaxed">
+          {servicio.descripcion || "Sin descripción"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal (sin cambios importantes) ──────────────────────────────────────────
 function ServicioModal({
   open,
   onClose,
@@ -105,7 +156,6 @@ function ServicioModal({
     >
       <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
         <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
-          {/* Franja de color del servicio */}
           <div className="flex items-center gap-2">
             <ColorDot color={form.color_hex} />
             <h2 className="font-medium text-base">
@@ -135,7 +185,7 @@ function ServicioModal({
             <label className="text-xs text-[var(--text-soft)] mb-1 block">Descripción</label>
             <textarea
               className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] resize-none"
-              rows={2}
+              rows={3}
               placeholder="Descripción breve del servicio..."
               value={form.descripcion}
               onChange={(e) => set("descripcion", e.target.value)}
@@ -167,9 +217,8 @@ function ServicioModal({
             </div>
           </div>
 
-          {/* Preview precio */}
           {form.precio > 0 && (
-            <p className="text-xs text-[var(--text-soft)] -mt-2">
+            <p className="text-xs text-[var(--text-soft)] -mt-1">
               ₡{Number(form.precio).toLocaleString("es-CR")} · {form.duracion_min} min
             </p>
           )}
@@ -182,11 +231,8 @@ function ServicioModal({
                   key={c}
                   type="button"
                   onClick={() => set("color_hex", c)}
-                  className={`w-6 h-6 rounded-full border-2 transition ${
-                    form.color_hex === c
-                      ? "border-white scale-110"
-                      : "border-transparent"
-                  }`}
+                  className={`w-6 h-6 rounded-full border-2 transition ${form.color_hex === c ? "border-white scale-110" : "border-transparent"
+                    }`}
                   style={{ background: c }}
                 />
               ))}
@@ -201,17 +247,14 @@ function ServicioModal({
           </div>
 
           <div className="flex items-center justify-between bg-[var(--bg-soft)] rounded-lg px-3 py-2">
-            <span className="text-sm">Estado</span>
+            <span className="text-sm">Servicio activo</span>
             <button
               type="button"
               onClick={() => set("activo", !form.activo)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${
-                form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"
-              }`}
+              className={`relative w-11 h-6 rounded-full transition-colors ${form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}
             >
               <span
-                className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
-                style={{ transform: form.activo ? "translateX(20px)" : "translateX(2px)" }}
+                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.activo ? "translate-x-5.5" : ""}`}
               />
             </button>
           </div>
@@ -234,7 +277,7 @@ function ServicioModal({
           </button>
           <button
             onClick={() => onSave(form, inicial?.id_servicio)}
-            disabled={loading || !form.nombre || form.duracion_min <= 0}
+            disabled={loading || !form.nombre.trim() || form.duracion_min <= 0}
             className="flex-1 py-2 rounded-lg text-sm font-medium text-white transition disabled:opacity-40"
             style={{ background: "var(--accent)" }}
           >
@@ -302,7 +345,7 @@ function ServiciosPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este servicio?")) return;
+    if (!confirm("¿Eliminar este servicio permanentemente?")) return;
     try {
       await supabase.from("servicios").delete().eq("id_servicio", id);
       toast.success("Servicio eliminado ✅");
@@ -316,12 +359,15 @@ function ServiciosPage() {
 
   const filtrados = servicios.filter((s) => {
     const matchBusq =
-      !busqueda || s.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      !busqueda ||
+      s.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       s.descripcion?.toLowerCase().includes(busqueda.toLowerCase());
+
     const matchActivo =
       filtroActivo === "todos" ||
       (filtroActivo === "activo" && s.activo) ||
       (filtroActivo === "inactivo" && !s.activo);
+
     return matchBusq && matchActivo;
   });
 
@@ -339,21 +385,23 @@ function ServiciosPage() {
         </div>
         <button
           onClick={() => { setEditando(null); setModalOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[var(--accent)] hover:opacity-90 transition"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white hover:opacity-90 transition"
+          style={{ background: "var(--accent)" }}
         >
           <span className="text-base leading-none">+</span>
           Nuevo servicio
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-2 items-center">
+      {/* Controles */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
         <input
-          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] w-48"
-          placeholder="Buscar servicio..."
+          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] w-full sm:w-72"
+          placeholder="Buscar por nombre o descripción..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
+
         <select
           className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
           value={filtroActivo}
@@ -363,79 +411,43 @@ function ServiciosPage() {
           <option value="activo">Activos</option>
           <option value="inactivo">Inactivos</option>
         </select>
+
+        <span className="text-xs text-[var(--text-soft)] ml-auto whitespace-nowrap">
+          {filtrados.length} resultado{filtrados.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl overflow-x-auto">
-        {loading ? (
-          <div className="flex items-center justify-center py-16 text-[var(--text-soft)] text-sm">
-            Cargando...
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <span className="text-3xl">✂️</span>
-            <p className="text-sm text-[var(--text-soft)]">No hay servicios registrados</p>
+      {/* Tarjetas */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-[var(--text-soft)] text-sm">
+          Cargando servicios...
+        </div>
+      ) : filtrados.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl">
+          <span className="text-4xl opacity-30">✂️</span>
+          <p className="text-sm text-[var(--text-soft)]">No se encontraron servicios</p>
+          {busqueda && (
             <button
-              onClick={() => { setEditando(null); setModalOpen(true); }}
-              className="text-sm mt-1 underline"
-              style={{ color: "var(--accent)" }}
+              onClick={() => setBusqueda("")}
+              className="text-xs text-[var(--accent)] hover:underline"
             >
-              Agregar el primero
+              Limpiar búsqueda
             </button>
-          </div>
-        ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-[var(--bg)]">
-              <tr className="border-b border-[var(--border)]">
-                {["Servicio", "Descripción", "Duración", "Precio", "Estado", "Acciones"].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase tracking-wide"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.map((s, i) => (
-                <tr
-                  key={s.id_servicio}
-                  className={`border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg)] transition ${
-                    i % 2 === 0 ? "" : "bg-[var(--bg)]/30"
-                  }`}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <ColorDot color={s.color_hex} />
-                      <span className="font-medium">{s.nombre}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-soft)] max-w-[200px] truncate">
-                    {s.descripcion || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-soft)]">{s.duracion_min} min</td>
-                  <td className="px-4 py-3 font-medium">
-                    ₡{Number(s.precio).toLocaleString("es-CR")}
-                  </td>
-                  <td className="px-4 py-3">
-                    <ActiveBadge activo={s.activo} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => { setEditando(s); setModalOpen(true); }}
-                      className="px-3 py-1 rounded-lg text-xs border border-[var(--border)] hover:bg-[var(--bg)] transition"
-                    >
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+          {filtrados.map((s) => (
+            <ServicioCard
+              key={s.id_servicio}
+              servicio={s}
+              onEdit={(s) => { setEditando(s); setModalOpen(true); }}
+            />
+          ))}
+        </div>
+      )}
 
+      {/* Modal */}
       <ServicioModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditando(null); }}

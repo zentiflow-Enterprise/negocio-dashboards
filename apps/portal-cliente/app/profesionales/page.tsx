@@ -57,7 +57,7 @@ function Avatar({ nombre, foto_url }: { nombre: string; foto_url?: string }) {
       <img
         src={foto_url}
         alt={nombre}
-        className="w-8 h-8 rounded-full object-cover border border-[var(--border)]"
+        className="w-9 h-9 rounded-full object-cover border border-[var(--border)] flex-shrink-0"
       />
     );
   }
@@ -69,7 +69,7 @@ function Avatar({ nombre, foto_url }: { nombre: string; foto_url?: string }) {
     .toUpperCase();
   return (
     <div
-      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white"
+      className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold text-white flex-shrink-0"
       style={{ background: "var(--accent)" }}
     >
       {initials}
@@ -81,18 +81,78 @@ function Avatar({ nombre, foto_url }: { nombre: string; foto_url?: string }) {
 function ActiveBadge({ activo }: { activo: boolean }) {
   return (
     <span
-      className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
+      className={[
+        "inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full font-medium border",
         activo
-          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-          : "bg-gray-500/10 text-gray-400 border-gray-400/20"
-      }`}
+          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+          : "bg-gray-500/10 text-gray-400 border-gray-400/20",
+      ].join(" ")}
     >
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${activo ? "bg-emerald-500" : "bg-gray-400"}`}
+      />
       {activo ? "Activo" : "Inactivo"}
     </span>
   );
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
+// ─── Tarjeta Profesional (compacta) ───────────────────────────────────────────
+function ProfesionalCard({
+  profesional,
+  turnoNombre,
+  onEdit,
+}: {
+  profesional: Profesional;
+  turnoNombre?: string;
+  onEdit: (p: Profesional) => void;
+}) {
+  return (
+    <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl flex flex-col gap-3 p-4 hover:border-[var(--accent)]/40 transition-all duration-150 h-full">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <Avatar nombre={profesional.nombre} foto_url={profesional.foto_url} />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm leading-tight truncate">{profesional.nombre}</p>
+            <p className="text-[11px] text-[var(--text-soft)] mt-0.5">
+              {profesional.email || "Sin email"}
+            </p>
+          </div>
+        </div>
+
+        {/* Estado + Editar */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <ActiveBadge activo={profesional.activo} />
+          <button
+            onClick={() => onEdit(profesional)}
+            className="px-2.5 py-1 rounded-lg text-[11px] border border-[var(--border)] hover:bg-[var(--bg-soft)] transition whitespace-nowrap"
+          >
+            Editar
+          </button>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-[var(--border)]" />
+
+      {/* Información */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+        <div>
+          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide">Teléfono</p>
+          <p className="font-mono text-[var(--text-soft)]">{profesional.telefono || "—"}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide">Turno</p>
+          <p className="text-[var(--text-soft)]">
+            {turnoNombre || "Sin turno asignado"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal (sin cambios mayores) ──────────────────────────────────────────────
 function ProfesionalModal({
   open,
   onClose,
@@ -140,7 +200,6 @@ function ProfesionalModal({
         </div>
 
         <div className="p-5 flex flex-col gap-4">
-          {/* Preview avatar */}
           <div className="flex items-center gap-3">
             <Avatar nombre={form.nombre || "?"} foto_url={form.foto_url} />
             <span className="text-sm text-[var(--text-soft)]">
@@ -208,19 +267,14 @@ function ProfesionalModal({
           </div>
 
           <div className="flex items-center justify-between bg-[var(--bg-soft)] rounded-lg px-3 py-2">
-            <span className="text-sm">Estado</span>
+            <span className="text-sm">Profesional activo</span>
             <button
               type="button"
               onClick={() => set("activo", !form.activo)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${
-                form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"
-              }`}
+              className={`relative w-11 h-6 rounded-full transition-colors ${form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}
             >
               <span
-                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                  form.activo ? "translate-x-5.5 left-0.5" : "left-0.5"
-                }`}
-                style={{ transform: form.activo ? "translateX(20px)" : "translateX(0)" }}
+                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.activo ? "translate-x-5.5" : ""}`}
               />
             </button>
           </div>
@@ -243,7 +297,7 @@ function ProfesionalModal({
           </button>
           <button
             onClick={() => onSave(form, inicial?.id_profesional)}
-            disabled={loading || !form.nombre}
+            disabled={loading || !form.nombre.trim()}
             className="flex-1 py-2 rounded-lg text-sm font-medium text-white transition disabled:opacity-40"
             style={{ background: "var(--accent)" }}
           >
@@ -318,7 +372,7 @@ function ProfesionalesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este profesional?")) return;
+    if (!confirm("¿Eliminar este profesional permanentemente?")) return;
     try {
       await supabase.from("profesionales").delete().eq("id_profesional", id);
       toast.success("Profesional eliminado ✅");
@@ -330,12 +384,13 @@ function ProfesionalesPage() {
     }
   };
 
-  const getTurno = (id_turno: string) =>
-    turnos.find((t) => t.id_turno === id_turno);
+  const getTurnoNombre = (id_turno: string) =>
+    turnos.find((t) => t.id_turno === id_turno)?.nombre_turno;
 
   const filtrados = profesionales.filter((p) => {
     const matchBusq =
-      !busqueda || p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      !busqueda ||
+      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       p.email?.toLowerCase().includes(busqueda.toLowerCase());
     const matchActivo =
       filtroActivo === "todos" ||
@@ -358,21 +413,23 @@ function ProfesionalesPage() {
         </div>
         <button
           onClick={() => { setEditando(null); setModalOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[var(--accent)] hover:opacity-90 transition"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white hover:opacity-90 transition"
+          style={{ background: "var(--accent)" }}
         >
           <span className="text-base leading-none">+</span>
           Nuevo profesional
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-2 items-center">
+      {/* Controles */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
         <input
-          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] w-48"
-          placeholder="Buscar nombre o email..."
+          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] w-full sm:w-72"
+          placeholder="Buscar por nombre o email..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
+
         <select
           className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
           value={filtroActivo}
@@ -382,86 +439,47 @@ function ProfesionalesPage() {
           <option value="activo">Activos</option>
           <option value="inactivo">Inactivos</option>
         </select>
+
+        <span className="text-xs text-[var(--text-soft)] ml-auto whitespace-nowrap">
+          {filtrados.length} resultado{filtrados.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl overflow-x-auto">
-        {loading ? (
-          <div className="flex items-center justify-center py-16 text-[var(--text-soft)] text-sm">
-            Cargando...
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <span className="text-3xl">👤</span>
-            <p className="text-sm text-[var(--text-soft)]">No hay profesionales registrados</p>
+      {/* Tarjetas */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-[var(--text-soft)] text-sm">
+          Cargando profesionales...
+        </div>
+      ) : filtrados.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl">
+          <span className="text-4xl opacity-30">👤</span>
+          <p className="text-sm text-[var(--text-soft)]">No se encontraron profesionales</p>
+          {busqueda && (
             <button
-              onClick={() => { setEditando(null); setModalOpen(true); }}
-              className="text-sm mt-1 underline"
-              style={{ color: "var(--accent)" }}
+              onClick={() => setBusqueda("")}
+              className="text-xs text-[var(--accent)] hover:underline"
             >
-              Agregar el primero
+              Limpiar búsqueda
             </button>
-          </div>
-        ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-[var(--bg)]">
-              <tr className="border-b border-[var(--border)]">
-                {["Profesional", "Email", "Teléfono", "Turno", "Estado", "Acciones"].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase tracking-wide"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.map((p, i) => {
-                const turno = getTurno(p.id_turno);
-                return (
-                  <tr
-                    key={p.id_profesional}
-                    className={`border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg)] transition ${
-                      i % 2 === 0 ? "" : "bg-[var(--bg)]/30"
-                    }`}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Avatar nombre={p.nombre} foto_url={p.foto_url} />
-                        <span className="font-medium">{p.nombre}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-[var(--text-soft)]">{p.email || "—"}</td>
-                    <td className="px-4 py-3 text-[var(--text-soft)]">{p.telefono || "—"}</td>
-                    <td className="px-4 py-3">
-                      {turno ? (
-                        <span className="text-xs bg-[var(--bg)] border border-[var(--border)] px-2 py-0.5 rounded-full">
-                          {turno.nombre_turno}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--text-soft)]">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <ActiveBadge activo={p.activo} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => { setEditando(p); setModalOpen(true); }}
-                        className="px-3 py-1 rounded-lg text-xs border border-[var(--border)] hover:bg-[var(--bg)] transition"
-                      >
-                        Editar
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+          {filtrados.map((p) => {
+            const turnoNombre = getTurnoNombre(p.id_turno);
+            return (
+              <ProfesionalCard
+                key={p.id_profesional}
+                profesional={p}
+                turnoNombre={turnoNombre}
+                onEdit={(p) => { setEditando(p); setModalOpen(true); }}
+              />
+            );
+          })}
+        </div>
+      )}
 
+      {/* Modal */}
       <ProfesionalModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditando(null); }}

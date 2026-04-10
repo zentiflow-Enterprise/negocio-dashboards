@@ -16,7 +16,7 @@ interface Cliente {
   origen: string | null;
   portal_habilitado: boolean;
   creado_en: string;
-  tiene_cita_reciente: boolean;        // Calculado con la vista
+  tiene_cita_reciente: boolean;
 }
 
 interface ClienteForm {
@@ -26,6 +26,8 @@ interface ClienteForm {
   origen: string;
   portal_habilitado: boolean;
 }
+
+type FiltroEstado = "todos" | "activo" | "inactivo";
 
 const FORM_EMPTY: ClienteForm = {
   nombre: "",
@@ -39,8 +41,27 @@ function genId() {
   return "cli_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+function fmtOrigen(o: string | null) {
+  const map: Record<string, string> = {
+    manual: "Manual",
+    whatsapp: "WhatsApp",
+    telegram: "Telegram",
+    web: "Web / Portal",
+  };
+  return o ? (map[o] ?? o) : "—";
+}
+
+function fmtDate(d: string | null) {
+  if (!d) return "Nunca";
+  return new Date(d).toLocaleDateString("es-CR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 // ─── Avatar ───────────────────────────────────────────────────────────────────
-function Avatar({ nombre }: { nombre: string }) {
+function Avatar({ nombre, size = 38 }: { nombre: string; size?: number }) {
   const initials = nombre
     .split(" ")
     .slice(0, 2)
@@ -50,26 +71,136 @@ function Avatar({ nombre }: { nombre: string }) {
 
   return (
     <div
-      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white"
-      style={{ background: "var(--accent)" }}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: "var(--accent)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: size < 32 ? 11 : 13,
+        fontWeight: 500,
+        color: "#fff",
+        flexShrink: 0,
+        opacity: 0.9,
+      }}
     >
       {initials}
     </div>
   );
 }
 
-// ─── Badge de Estado ─────────────────────────────────────────────────────────
-function EstadoBadge({ tieneCitaReciente }: { tieneCitaReciente: boolean }) {
+// ─── Badge Estado ─────────────────────────────────────────────────────────────
+function EstadoBadge({ activo }: { activo: boolean }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-[10px] px-3 py-1 rounded-full font-medium border ${tieneCitaReciente
-        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-        : "bg-gray-500/10 text-gray-400 border-gray-400/20"
-        }`}
+      className={[
+        "inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full font-medium border",
+        activo
+          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+          : "bg-gray-500/10 text-gray-400 border-gray-400/20",
+      ].join(" ")}
     >
-      <span className={`w-2 h-2 rounded-full ${tieneCitaReciente ? "bg-emerald-500" : "bg-gray-400"}`} />
-      {tieneCitaReciente ? "Activo" : "Inactivo"}
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${activo ? "bg-emerald-500" : "bg-gray-400"}`}
+      />
+      {activo ? "Activo" : "Inactivo"}
     </span>
+  );
+}
+
+// ─── Portal Badge ─────────────────────────────────────────────────────────────
+function PortalBadge({ habilitado }: { habilitado: boolean }) {
+  return (
+    <span
+      className={[
+        "text-[10px] px-2.5 py-1 rounded-full border font-medium",
+        habilitado
+          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+          : "bg-amber-500/10 text-amber-500 border-amber-500/20",
+      ].join(" ")}
+    >
+      {habilitado ? "Portal activo" : "Portal inactivo"}
+    </span>
+  );
+}
+
+// ─── Tarjeta cliente ──────────────────────────────────────────────────────────
+function ClienteCard({
+  cliente,
+  onEdit,
+}: {
+  cliente: Cliente;
+  onEdit: (c: Cliente) => void;
+}) {
+  return (
+    <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl flex flex-col gap-3 p-4 hover:border-[var(--accent)]/40 transition-all duration-150">
+      {/* Header */}
+      <div className="flex items-start gap-3">
+        <Avatar nombre={cliente.nombre} />
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm leading-tight truncate">{cliente.nombre}</p>
+          <p className="text-[11px] text-[var(--text-soft)] mt-0.5">{fmtOrigen(cliente.origen)}</p>
+        </div>
+        <EstadoBadge activo={cliente.tiene_cita_reciente} />
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-[var(--border)]" />
+
+      {/* Info grid */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+        {/* Email — full width */}
+        <div className="col-span-2">
+          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">Email</p>
+          <p
+            className={`text-xs truncate ${cliente.email ? "text-[var(--color-text-primary)]" : "text-[var(--text-soft)]"
+              }`}
+          >
+            {cliente.email || "No registrado"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">WhatsApp</p>
+          <p className={`text-xs font-mono ${cliente.id_whatsapp ? "" : "text-[var(--text-soft)]"}`}>
+            {cliente.id_whatsapp || "—"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">Última visita</p>
+          <p className="text-xs">{fmtDate(cliente.ultima_visita)}</p>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-[var(--border)]" />
+
+      {/* Footer */}
+      <div className="flex items-center justify-between gap-2">
+        <PortalBadge habilitado={cliente.portal_habilitado} />
+        <div className="flex gap-1.5">
+          {cliente.id_whatsapp && (
+            <a
+              href={`https://wa.me/${cliente.id_whatsapp}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1 rounded-lg text-[11px] border border-emerald-500/30 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 transition"
+            >
+              WA
+            </a>
+          )}
+          <button
+            onClick={() => onEdit(cliente)}
+            className="px-3 py-1 rounded-lg text-[11px] border border-[var(--border)] hover:bg-[var(--bg-soft)] transition"
+          >
+            Editar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -106,10 +237,14 @@ function ClienteModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
+        {/* Header modal */}
         <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
-          <h2 className="font-medium text-base">
-            {inicial?.cliente_id ? "Editar cliente" : "Nuevo cliente"}
-          </h2>
+          <div className="flex items-center gap-3">
+            <Avatar nombre={form.nombre || "?"} size={30} />
+            <h2 className="font-medium text-sm">
+              {inicial?.cliente_id ? "Editar cliente" : "Nuevo cliente"}
+            </h2>
+          </div>
           <button
             onClick={onClose}
             className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]"
@@ -118,14 +253,8 @@ function ClienteModal({
           </button>
         </div>
 
+        {/* Campos */}
         <div className="p-5 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <Avatar nombre={form.nombre || "?"} />
-            <span className="text-sm text-[var(--text-soft)]">
-              {form.nombre || "Nombre del cliente"}
-            </span>
-          </div>
-
           <div>
             <label className="text-xs text-[var(--text-soft)] mb-1 block">Nombre completo *</label>
             <input
@@ -148,7 +277,7 @@ function ClienteModal({
           </div>
 
           <div>
-            <label className="text-xs text-[var(--text-soft)] mb-1 block">WhatsApp (id_whatsapp)</label>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">WhatsApp</label>
             <input
               type="tel"
               className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
@@ -188,6 +317,7 @@ function ClienteModal({
           </div>
         </div>
 
+        {/* Acciones modal */}
         <div className="flex gap-2 p-5 border-t border-[var(--border)]">
           {inicial?.cliente_id && onDelete && (
             <button
@@ -226,6 +356,7 @@ function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [filtro, setFiltro] = useState<FiltroEstado>("todos");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState<Cliente | null>(null);
@@ -234,7 +365,6 @@ function ClientesPage() {
     if (!negocio?.id) return;
     setLoading(true);
 
-    // 1. Obtener clientes del negocio
     const { data: clientesData } = await supabase
       .from("clientes_negocio")
       .select("cliente_id, nombre, email, id_whatsapp, ultima_visita, origen, portal_habilitado, creado_en")
@@ -249,7 +379,6 @@ function ClientesPage() {
 
     const clienteIds = clientesData.map((c: any) => c.cliente_id);
 
-    // 2. Usar la vista para obtener clientes con actividad reciente (últimos 3 meses)
     const { data: clientesActivos } = await supabase
       .from("v_clientes_con_actividad_reciente")
       .select("id_cliente")
@@ -258,13 +387,12 @@ function ClientesPage() {
 
     const setActivos = new Set(clientesActivos?.map((c: any) => c.id_cliente) || []);
 
-    // 3. Agregar el estado calculado
-    const clientesConEstado = clientesData.map((cliente: any) => ({
-      ...cliente,
-      tiene_cita_reciente: setActivos.has(cliente.cliente_id),
-    }));
-
-    setClientes(clientesConEstado as Cliente[]);
+    setClientes(
+      clientesData.map((c: any) => ({
+        ...c,
+        tiene_cita_reciente: setActivos.has(c.cliente_id),
+      })) as Cliente[]
+    );
     setLoading(false);
   }, [negocio?.id]);
 
@@ -287,11 +415,7 @@ function ClientesPage() {
         toast.success("Cliente actualizado ✅");
       } else {
         await supabase.from("clientes_negocio").insert([
-          {
-            ...payload,
-            cliente_id: genId(),
-            creado_en: new Date().toISOString(),
-          },
+          { ...payload, cliente_id: genId(), creado_en: new Date().toISOString() },
         ]);
         toast.success("Cliente creado ✅");
       }
@@ -309,7 +433,6 @@ function ClientesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar este cliente permanentemente? Esta acción no se puede deshacer.")) return;
-
     try {
       await supabase.from("clientes_negocio").delete().eq("cliente_id", id);
       toast.success("Cliente eliminado ✅");
@@ -323,12 +446,23 @@ function ClientesPage() {
     }
   };
 
-  const filtrados = clientes.filter((c) =>
-    !busqueda ||
-    c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    c.email?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    c.id_whatsapp?.includes(busqueda)
-  );
+  const filtrados = clientes.filter((c) => {
+    if (filtro === "activo" && !c.tiene_cita_reciente) return false;
+    if (filtro === "inactivo" && c.tiene_cita_reciente) return false;
+    if (!busqueda) return true;
+    const q = busqueda.toLowerCase();
+    return (
+      c.nombre.toLowerCase().includes(q) ||
+      c.email?.toLowerCase().includes(q) ||
+      c.id_whatsapp?.includes(q)
+    );
+  });
+
+  const FILTROS: { key: FiltroEstado; label: string }[] = [
+    { key: "todos", label: "Todos" },
+    { key: "activo", label: "Activos" },
+    { key: "inactivo", label: "Inactivos" },
+  ];
 
   return (
     <div className="p-6 lg:p-8 w-full max-w-7xl mx-auto flex flex-col gap-6">
@@ -342,106 +476,93 @@ function ClientesPage() {
         </div>
         <button
           onClick={() => { setEditando(null); setModalOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[var(--accent)] hover:opacity-90 transition"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white hover:opacity-90 transition"
+          style={{ background: "var(--accent)" }}
         >
           <span className="text-base leading-none">+</span>
           Nuevo cliente
         </button>
       </div>
 
-      {/* Buscador */}
-      <input
-        className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] w-80"
-        placeholder="Buscar por nombre, email o WhatsApp..."
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-      />
+      {/* Controles */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+        <input
+          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] w-full sm:w-72"
+          placeholder="Buscar por nombre, email o WhatsApp..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
 
-      {/* Tabla */}
-      <div className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl overflow-x-auto">
-        {loading ? (
-          <div className="flex items-center justify-center py-16 text-[var(--text-soft)]">
-            Cargando clientes...
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <span className="text-3xl">👥</span>
-            <p className="text-sm text-[var(--text-soft)]">No se encontraron clientes</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-[var(--bg)]">
-              <tr className="border-b border-[var(--border)]">
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase tracking-wide">Cliente</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase tracking-wide">Email</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase tracking-wide">WhatsApp</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase tracking-wide">Última visita</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase tracking-wide">Estado</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase tracking-wide">Portal</th>
-                <th className="text-left px-4 py-3 text-xs text-[var(--text-soft)] font-medium uppercase tracking-wide">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.map((c, i) => (
-                <tr
-                  key={c.cliente_id}
-                  className={`border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg)] transition ${i % 2 === 1 ? "bg-[var(--bg)]/30" : ""
-                    }`}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar nombre={c.nombre} />
-                      <span className="font-medium">{c.nombre}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-soft)]">{c.email || "—"}</td>
-                  <td className="px-4 py-3 font-mono text-sm text-[var(--text-soft)]">
-                    {c.id_whatsapp || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-[var(--text-soft)]">
-                    {c.ultima_visita ? new Date(c.ultima_visita).toLocaleDateString("es-CR") : "Nunca"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <EstadoBadge tieneCitaReciente={c.tiene_cita_reciente} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`text-xs px-2.5 py-0.5 rounded-full border ${c.portal_habilitado
-                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                        : "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                        }`}
-                    >
-                      {c.portal_habilitado ? "Habilitado" : "Deshabilitado"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => { setEditando(c); setModalOpen(true); }}
-                      className="px-3 py-1 rounded-lg text-xs border border-[var(--border)] hover:bg-[var(--bg)] transition"
-                    >
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        {/* Filtros de estado */}
+        <div className="flex gap-1.5">
+          {FILTROS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFiltro(f.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs border transition ${filtro === f.key
+                  ? "text-white border-transparent"
+                  : "border-[var(--border)] text-[var(--text-soft)] hover:bg-[var(--bg-soft)]"
+                }`}
+              style={filtro === f.key ? { background: "var(--accent)" } : {}}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <span className="text-xs text-[var(--text-soft)] ml-auto whitespace-nowrap">
+          {filtrados.length} resultado{filtrados.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
+      {/* Contenido */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-[var(--text-soft)] text-sm">
+          Cargando clientes...
+        </div>
+      ) : filtrados.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl">
+          <span className="text-4xl opacity-30">👥</span>
+          <p className="text-sm text-[var(--text-soft)]">No se encontraron clientes</p>
+          {busqueda && (
+            <button
+              onClick={() => setBusqueda("")}
+              className="text-xs text-[var(--accent)] hover:underline"
+            >
+              Limpiar búsqueda
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtrados.map((c) => (
+            <ClienteCard
+              key={c.cliente_id}
+              cliente={c}
+              onEdit={(c) => { setEditando(c); setModalOpen(true); }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Modal */}
       <ClienteModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditando(null); }}
         onSave={handleSave}
         onDelete={handleDelete}
-        inicial={editando ? {
-          cliente_id: editando.cliente_id,
-          nombre: editando.nombre,
-          email: editando.email,
-          id_whatsapp: editando.id_whatsapp ?? undefined,
-          origen: editando.origen ?? undefined,
-          portal_habilitado: editando.portal_habilitado,
-        } : undefined}
+        inicial={
+          editando
+            ? {
+              cliente_id: editando.cliente_id,
+              nombre: editando.nombre,
+              email: editando.email,
+              id_whatsapp: editando.id_whatsapp ?? undefined,
+              origen: editando.origen ?? undefined,
+              portal_habilitado: editando.portal_habilitado,
+            }
+            : undefined
+        }
         loading={saving}
       />
     </div>
