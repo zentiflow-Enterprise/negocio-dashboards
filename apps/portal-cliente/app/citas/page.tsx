@@ -12,7 +12,7 @@ interface Cita {
   id_cliente: string; //
   id_profesional: string;    // ← agregar
   id_servicio: string;       // ← agregar
-  nombre_cliente: string;
+  nombre_cliente?: string;
   nombre_profesional: string;
   nombre_servicio: string;
   color_hex: string;
@@ -239,7 +239,7 @@ function CitaModal({
   const esEdicion = !!inicial?.id_cita;
 
   const camposCompletos =
-    !!form.nombre_cliente &&
+    !!form.id_cliente &&
     !!form.id_profesional &&
     !!form.id_servicio &&
     !!form.fecha &&
@@ -705,7 +705,7 @@ function CitasOperativasPage() {
         // Crear — usa RPC
         const { error } = await supabase.rpc("rpc_crear_cita", {
           p_negocio_id: negocio.id,
-          p_nombre_cliente: form.nombre_cliente,
+          p_nombre_cliente: form.id_cliente,
           p_id_profesional: form.id_profesional,
           p_id_servicio: form.id_servicio,
           p_fecha: form.fecha,
@@ -764,10 +764,11 @@ function CitasOperativasPage() {
   const citasFiltradas = citas.filter((c) => {
     const matchBusq =
       !busqueda ||
-      c.nombre_cliente.toLowerCase().includes(busqueda.toLowerCase()) ||
+      (c.nombre_cliente ?? "").toLowerCase().includes(busqueda.toLowerCase()) ||
       c.nombre_servicio.toLowerCase().includes(busqueda.toLowerCase());
 
-    const matchEstado = filtroEstado === "todos" || c.estado === filtroEstado;
+    const matchEstado =
+      filtroEstado === "todos" || c.estado === filtroEstado;
 
     return matchBusq && matchEstado;
   });
@@ -910,7 +911,7 @@ function CitasOperativasPage() {
           onCrear={({ hora, id_profesional }) => {
             setEditando({
               id_cita: "",
-              nombre_cliente: "",
+              id_cliente: "",
               id_profesional,
               id_servicio: "",
               fecha: new Date().toISOString().split("T")[0]!,
