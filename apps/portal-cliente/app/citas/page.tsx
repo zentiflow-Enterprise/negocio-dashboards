@@ -124,6 +124,10 @@ function DatePickerCustom({ value, onChange }: any) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+
+
 function EstadoBadge({ estado }: { estado: string }) {
   const colorClass = ESTADO_COLOR[estado] ?? "bg-gray-500/10 text-gray-400 border-gray-400/20";
   return <span className={`text-xs px-3 py-1 rounded-full font-medium border capitalize ${colorClass}`}>{estado}</span>;
@@ -139,6 +143,80 @@ function formatHora(hora: string) {
   const date = new Date();
   date.setHours(hh ?? 0, mm ?? 0);
   return date.toLocaleTimeString("es-CR", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+function ConfirmModal({ open, onClose, onConfirm, title, message, confirmLabel = "Confirmar", variant = "danger", loading }: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  variant?: "danger" | "success" | "warning";
+  loading?: boolean;
+}) {
+  if (!open) return null;
+
+  const variantStyles = {
+    danger: { btn: "bg-red-500 hover:bg-red-600 text-white", icon: "text-red-500", bg: "bg-red-500/10" },
+    success: { btn: "bg-emerald-500 hover:bg-emerald-600 text-white", icon: "text-emerald-500", bg: "bg-emerald-500/10" },
+    warning: { btn: "bg-amber-500 hover:bg-amber-600 text-white", icon: "text-amber-500", bg: "bg-amber-500/10" },
+  };
+  const s = variantStyles[variant];
+
+  const icons = {
+    danger: (
+      <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
+        <path d="M3 4h10M6 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5 4l.5 9h5L11 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M7 7v4M9 7v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+    success: (
+      <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
+        <path d="M3 8.5l3.5 3.5 6.5-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    warning: (
+      <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
+        <path d="M8 3v5M8 10.5v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M2 13L8 2l6 11H2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      </svg>
+    ),
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-xs shadow-2xl">
+        <div className="p-6 flex flex-col items-center text-center gap-3">
+          <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.icon} flex items-center justify-center`}>
+            {icons[variant]}
+          </div>
+          <div>
+            <p className="font-semibold text-base">{title}</p>
+            <p className="text-sm text-[var(--text-soft)] mt-1 leading-relaxed">{message}</p>
+          </div>
+        </div>
+        <div className="flex gap-2 px-5 pb-5">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-[var(--border)] text-sm hover:bg-[var(--bg-soft)] transition"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition disabled:opacity-40 ${s.btn}`}
+          >
+            {loading ? "..." : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function CitaDetailModal({ open, onClose, cita, onReprogramar, onCancelar, onCompletar, loading }: {
@@ -784,6 +862,17 @@ function CitasOperativasPage() {
   });
   const [clienteModalOpen, setClienteModalOpen] = useState(false);
 
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: "danger" | "success" | "warning";
+    onConfirm: () => void;
+  }>({
+    open: false, title: "", message: "", confirmLabel: "Confirmar", variant: "danger", onConfirm: () => { },
+  });
+
   useEffect(() => { localStorage.setItem("vista", vista); }, [vista]);
 
   useEffect(() => {
@@ -791,6 +880,9 @@ function CitasOperativasPage() {
     supabase.from("config_negocio_horario").select("*").eq("negocio_id", negocio.id).then(({ data }) => setHorarioSemanal(data || []));
     supabase.from("config_negocio_excepciones").select("*").eq("negocio_id", negocio.id).then(({ data }) => setExcepciones(data || []));
   }, [negocio?.id]);
+
+  const askConfirm = (opts: Omit<typeof confirm, "open">) =>
+    setConfirm({ open: true, ...opts });
 
   const loadCitas = useCallback(async () => {
     if (!negocio?.id) return;
@@ -858,22 +950,44 @@ function CitasOperativasPage() {
     finally { setSaving(false); }
   };
 
-  const handleCancelar = async (id: string) => {
-    if (!confirm("¿Cancelar esta cita?")) return;
-    try {
-      const { error } = await supabase.rpc("rpc_cancelar_cita", { p_id_cita: id, p_negocio_id: negocio?.id, p_motivo: null });
-      if (error) throw error;
-      toast.success("Cita cancelada ✅"); loadCitas();
-    } catch (err: any) { toast.error(err.message || "Error al cancelar"); }
+  const handleCancelar = (id: string) => {
+    askConfirm({
+      title: "Cancelar cita",
+      message: "Esta acción no se puede deshacer. ¿Seguro que quieres cancelar esta cita?",
+      confirmLabel: "Sí, cancelar",
+      variant: "danger",
+      onConfirm: async () => {
+        setConfirm((p) => ({ ...p, open: false }));
+        try {
+          const { error } = await supabase.rpc("rpc_cancelar_cita", {
+            p_id_cita: id, p_negocio_id: negocio?.id, p_motivo: null,
+          });
+          if (error) throw error;
+          toast.success("Cita cancelada ✅");
+          loadCitas();
+        } catch (err: any) { toast.error(err.message || "Error al cancelar"); }
+      },
+    });
   };
 
-  const handleCompletar = async (id: string) => {
-    if (!confirm("¿Marcar como completada?")) return;
-    try {
-      const { error } = await supabase.rpc("rpc_completar_cita", { p_id_cita: id, p_negocio_id: negocio?.id, p_notas_internas: null });
-      if (error) throw error;
-      toast.success("Cita completada ✅"); loadCitas();
-    } catch (err: any) { toast.error(err.message || "Error al completar"); }
+  const handleCompletar = (id: string) => {
+    askConfirm({
+      title: "Completar cita",
+      message: "¿Confirmas que el servicio fue realizado y deseas marcarlo como completado?",
+      confirmLabel: "Sí, completar",
+      variant: "success",
+      onConfirm: async () => {
+        setConfirm((p) => ({ ...p, open: false }));
+        try {
+          const { error } = await supabase.rpc("rpc_completar_cita", {
+            p_id_cita: id, p_negocio_id: negocio?.id, p_notas_internas: null,
+          });
+          if (error) throw error;
+          toast.success("Cita completada ✅");
+          loadCitas();
+        } catch (err: any) { toast.error(err.message || "Error al completar"); }
+      },
+    });
   };
 
   const citasFiltradas = citas.filter((c) => {
@@ -898,18 +1012,27 @@ function CitasOperativasPage() {
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => setVista("lista")} className={`px-4 py-2 rounded-xl text-sm ${vista === "lista" ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-soft)]"}`}>Lista (cards)</button>
-        <button onClick={() => setVista("agenda")} className={`px-4 py-2 rounded-xl text-sm ${vista === "agenda" ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-soft)]"}`}>Agenda (calendario)</button>
+        <button onClick={() => setVista("lista")} className={`px-4 py-2 rounded-xl text-sm ${vista === "lista" ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-soft)]"}`}>Lista</button>
+        <button onClick={() => setVista("agenda")} className={`px-4 py-2 rounded-xl text-sm ${vista === "agenda" ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-soft)]"}`}>Agenda</button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 items-center">
         <input className="flex-1 bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm" placeholder="Buscar cliente o servicio..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-        <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value as any)} className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm">
-          <option value="todos">Todos los estados</option>
-          <option value="Agendada">Agendada</option>
-          <option value="Reprogramada">Reprogramada</option>
-          <option value="Cancelada">Cancelada</option>
-        </select>
+        {/* Contador — siempre visible en ambas vistas */}
+        <div className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm font-medium tabular-nums whitespace-nowrap">
+          {citas.filter(c => c.estado !== "Cancelada").length} citas · ₡{citas.filter(c => c.estado !== "Cancelada").reduce((acc, c) => acc + Number(c.precio), 0).toLocaleString("es-CR")}
+        </div>
+
+        {vista === "lista" && (
+          <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value as any)} className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm">
+            <option value="todos">Todos los estados</option>
+            <option value="Agendada">Agendada</option>
+            <option value="Reprogramada">Reprogramada</option>
+            <option value="Completada">Completada</option>
+          </select>
+
+        )}
+
         <select value={filtroProfesional} onChange={(e) => setFiltroProfesional(e.target.value)} className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm">
           <option value="todos">Todos los profesionales</option>
           {profesionales.map((p) => <option key={p.id_profesional} value={p.id_profesional}>{p.nombre}</option>)}
@@ -960,6 +1083,19 @@ function CitasOperativasPage() {
       <CitaModal open={modalOpen} onClose={() => { setModalOpen(false); setEditando(null); }} onSave={handleSave} profesionales={profesionales} servicios={servicios} clientes={clientes} onCrearCliente={() => setClienteModalOpen(true)} inicial={editando ? { ...editando, hora: editando.hora?.slice(0, 5) } : undefined} loading={saving} />
 
       <ClienteModal open={clienteModalOpen} onClose={() => setClienteModalOpen(false)} onSave={handleGuardarCliente} loading={saving} />
+
+      <ConfirmModal
+        open={confirm.open}
+        onClose={() => setConfirm((p) => ({ ...p, open: false }))}
+        onConfirm={confirm.onConfirm}
+        title={confirm.title}
+        message={confirm.message}
+        confirmLabel={confirm.confirmLabel}
+        variant={confirm.variant}
+      />
+
+
+
       <CitaDetailModal
         open={detailOpen}
         onClose={() => { setDetailOpen(false); setDetailCita(null); }}
