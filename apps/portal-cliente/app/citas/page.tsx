@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@supabase/lib/client";
 import { useNegocio } from "@/lib/hooks/useNegocio";
 import DashboardLayout from "../dashboard/layout";
 import toast from "react-hot-toast";
-import Holidays from "date-holidays";   // ← Nueva importación
+import Holidays from "date-holidays";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Cita {
@@ -30,10 +32,7 @@ interface Profesional {
   nombre: string;
   activo: boolean;
   id_especialidad?: string;
-  especialidad?: {
-    nombre: string;
-    sector: string;
-  };
+  especialidad?: { nombre: string; sector: string };
 }
 
 interface Servicio {
@@ -53,6 +52,14 @@ interface CitaForm {
   notas: string;
 }
 
+interface ClienteForm {
+  nombre: string;
+  email: string;
+  id_whatsapp: string;
+  origen: string;
+  portal_habilitado: boolean;
+}
+
 interface HorarioDia {
   dia_semana: number;
   hora_inicio: string;
@@ -70,14 +77,7 @@ interface Excepcion {
   motivo?: string;
 }
 
-const FORM_EMPTY: CitaForm = {
-  id_cliente: "",
-  id_profesional: "",
-  id_servicio: "",
-  fecha: "",
-  hora: "",
-  notas: "",
-};
+const FORM_EMPTY: CitaForm = { id_cliente: "", id_profesional: "", id_servicio: "", fecha: "", hora: "", notas: "" };
 
 const ESTADO_COLOR: Record<string, string> = {
   Agendada: "bg-blue-500/10 text-blue-600 border-blue-500/30",
@@ -86,22 +86,51 @@ const ESTADO_COLOR: Record<string, string> = {
   Completada: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function EstadoBadge({ estado }: { estado: string }) {
-  const colorClass = ESTADO_COLOR[estado] ?? "bg-gray-500/10 text-gray-400 border-gray-400/20";
+function genId() {
+  return "cli_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function to12h(time: string) {
+  const [h = 0, m = 0] = time.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${m.toString().padStart(2, "0")} ${period}`;
+}
+
+// ─── DatePicker ───────────────────────────────────────────────────────────────
+function DatePickerCustom({ value, onChange }: any) {
+  const [open, setOpen] = useState(false);
   return (
-    <span className={`text-xs px-3 py-1 rounded-full font-medium border capitalize ${colorClass}`}>
-      {estado}
-    </span>
+    <div className="relative">
+      <button onClick={() => setOpen(!open)} className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm w-full text-left">
+        📅 {value === new Date().toISOString().split("T")[0] ? "Hoy" : value}
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-2 bg-[var(--bg)] border border-[var(--border)] rounded-xl p-3 shadow-xl">
+          <DayPicker
+            mode="single"
+            selected={value ? new Date(value + "T12:00:00") : undefined}
+            onSelect={(date) => {
+              if (!date) return;
+              const formatted = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+              onChange(formatted);
+              setOpen(false);
+            }}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function EstadoBadge({ estado }: { estado: string }) {
+  const colorClass = ESTADO_COLOR[estado] ?? "bg-gray-500/10 text-gray-400 border-gray-400/20";
+  return <span className={`text-xs px-3 py-1 rounded-full font-medium border capitalize ${colorClass}`}>{estado}</span>;
+}
+
 function formatFecha(fecha: string) {
-  return new Intl.DateTimeFormat("es-CR", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-  }).format(new Date(fecha + "T00:00:00"));
+  return new Intl.DateTimeFormat("es-CR", { weekday: "short", day: "2-digit", month: "short" }).format(new Date(fecha + "T00:00:00"));
 }
 
 function formatHora(hora: string) {
@@ -112,8 +141,10 @@ function formatHora(hora: string) {
   return date.toLocaleTimeString("es-CR", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
-// ─── CitaCard ────────────────────────────────────────────────────────────────
-function CitaCard({ cita, onReprogramar, onCancelar, onCompletar }: { cita: Cita; onReprogramar: (c: Cita) => void; onCancelar: (id: string) => void; onCompletar: (id: string) => void; }) {
+// ─── CitaCard ─────────────────────────────────────────────────────────────────
+function CitaCard({ cita, onReprogramar, onCancelar, onCompletar }: {
+  cita: Cita; onReprogramar: (c: Cita) => void; onCancelar: (id: string) => void; onCompletar: (id: string) => void;
+}) {
   return (
     <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl flex flex-col p-4 hover:border-[var(--accent)]/40 transition-all duration-150 h-full">
       <div className="h-1 rounded-full mb-3 opacity-70" style={{ background: cita.color_hex ?? "var(--accent)" }} />
@@ -132,46 +163,62 @@ function CitaCard({ cita, onReprogramar, onCancelar, onCompletar }: { cita: Cita
         <div>
           <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">SERVICIO</p>
           <p className="text-sm font-medium leading-tight">{cita.nombre_servicio}</p>
-          <p className="text-xs text-[var(--text-soft)] mt-0.5">
-            {cita.duracion_min} min • ₡{Number(cita.precio).toLocaleString("es-CR")}
-          </p>
+          <p className="text-xs text-[var(--text-soft)] mt-0.5">{cita.duracion_min} min • ₡{Number(cita.precio).toLocaleString("es-CR")}</p>
         </div>
         <div>
           <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">PROFESIONAL</p>
           <p className="text-sm leading-tight">{cita.nombre_profesional}</p>
         </div>
       </div>
-      {cita.notas && (
-        <div className="mb-4 p-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-soft)]">
-          {cita.notas}
-        </div>
-      )}
+      {cita.notas && <div className="mb-4 p-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-soft)]">{cita.notas}</div>}
       <div className="mt-auto pt-4 border-t border-[var(--border)] flex flex-wrap gap-2">
         <button onClick={() => onReprogramar(cita)} className="flex-1 px-4 py-2.5 text-xs font-medium border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 rounded-lg transition">Reprogramar</button>
-        {(cita.estado !== "Cancelada" && cita.estado !== "Completada") && (
-          <button onClick={() => onCancelar(cita.id_cita)} className="flex-1 px-4 py-2.5 text-xs font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg transition">Cancelar</button>
-        )}
-        {(cita.estado !== "Completada" && cita.estado !== "Cancelada") && (
-          <button onClick={() => onCompletar(cita.id_cita)} className="flex-1 px-4 py-2.5 text-xs font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition">Completar</button>
-        )}
+        {cita.estado !== "Cancelada" && cita.estado !== "Completada" && <button onClick={() => onCancelar(cita.id_cita)} className="flex-1 px-4 py-2.5 text-xs font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg transition">Cancelar</button>}
+        {cita.estado !== "Completada" && cita.estado !== "Cancelada" && <button onClick={() => onCompletar(cita.id_cita)} className="flex-1 px-4 py-2.5 text-xs font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition">Completar</button>}
       </div>
     </div>
   );
 }
 
-// ─── CitaModal y ClienteModal (sin cambios) ───────────────────────────────────
+// ─── ClienteBuscador ──────────────────────────────────────────────────────────
+function ClienteBuscador({ clientes, value, onChange, onCrearCliente }: {
+  clientes: any[]; value: string; onChange: (id: string) => void; onCrearCliente: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [abierto, setAbierto] = useState(false);
+  const seleccionado = clientes.find((c) => c.cliente_id === value);
+  const filtrados = clientes.filter((c) => {
+    const q = query.toLowerCase();
+    return c.nombre.toLowerCase().includes(q) || (c.id_whatsapp && c.id_whatsapp.includes(q));
+  }).slice(0, 20);
+  return (
+    <div className="relative">
+      <input className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" placeholder="Buscar por nombre o teléfono..." value={seleccionado ? seleccionado.nombre : query} onFocus={() => { setAbierto(true); if (seleccionado) setQuery(""); }} onBlur={() => setTimeout(() => setAbierto(false), 150)} onChange={(e) => { setQuery(e.target.value); onChange(""); }} />
+      {abierto && (
+        <div className="absolute z-50 w-full mt-1 bg-[var(--bg)] border border-[var(--border)] rounded-xl shadow-xl max-h-52 overflow-y-auto">
+          {filtrados.length > 0 ? filtrados.map((c) => (
+            <div key={c.cliente_id} className="px-3 py-2 cursor-pointer hover:bg-[var(--bg-soft)]" onMouseDown={() => { onChange(c.cliente_id); setQuery(""); setAbierto(false); }}>
+              <div className="text-sm">{c.nombre}</div>
+              {c.id_whatsapp && <div className="text-xs text-[var(--text-soft)]">📱 {c.id_whatsapp}</div>}
+            </div>
+          )) : <div className="px-3 py-2 text-sm text-[var(--text-soft)]">Sin resultados</div>}
+          <div className="px-3 py-2 text-sm text-[var(--accent)] font-medium border-t border-[var(--border)] cursor-pointer hover:bg-[var(--bg-soft)]" onMouseDown={onCrearCliente}>+ Crear cliente nuevo</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── CitaModal ────────────────────────────────────────────────────────────────
 function CitaModal({ open, onClose, onSave, profesionales, servicios, clientes, onCrearCliente, inicial, loading }: any) {
   const [form, setForm] = useState<CitaForm>({ ...FORM_EMPTY, ...inicial });
-
   useEffect(() => { setForm({ ...FORM_EMPTY, ...inicial }); }, [inicial, open]);
-
+  useEffect(() => { setForm((prev) => ({ ...prev, id_cliente: inicial?.id_cliente || "" })); }, [inicial?.id_cliente]);
   if (!open) return null;
-
   const set = (k: keyof CitaForm, v: string) => setForm((p) => ({ ...p, [k]: v }));
   const servSel = servicios.find((s: any) => s.id_servicio === form.id_servicio);
   const esEdicion = !!inicial?.id_cita;
   const camposCompletos = !!form.id_cliente && !!form.id_profesional && !!form.id_servicio && !!form.fecha && !!form.hora;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
@@ -180,20 +227,12 @@ function CitaModal({ open, onClose, onSave, profesionales, servicios, clientes, 
           <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]">✕</button>
         </div>
         <div className="p-5 flex flex-col gap-4">
-          {/* Cliente */}
           <div>
             <label className="text-xs text-[var(--text-soft)] mb-1 block">Cliente *</label>
-            <select className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.id_cliente} onChange={(e) => {
-              if (e.target.value === "__nuevo__") { onCrearCliente(); return; }
-              set("id_cliente", e.target.value);
-            }} disabled={esEdicion}>
-              <option value="">Seleccionar cliente...</option>
-              {clientes.map((c: any) => <option key={c.id_cliente} value={c.id_cliente}>{c.nombre}</option>)}
-              <option value="__nuevo__">+ Crear cliente</option>
-            </select>
+            {esEdicion
+              ? <input className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm opacity-60" value={clientes.find((c: any) => c.cliente_id === form.id_cliente)?.nombre || ""} disabled />
+              : <ClienteBuscador clientes={clientes} value={form.id_cliente} onChange={(id) => set("id_cliente", id)} onCrearCliente={onCrearCliente} />}
           </div>
-
-          {/* Profesional */}
           <div>
             <label className="text-xs text-[var(--text-soft)] mb-1 block">Profesional *</label>
             <select className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.id_profesional} onChange={(e) => set("id_profesional", e.target.value)}>
@@ -201,8 +240,6 @@ function CitaModal({ open, onClose, onSave, profesionales, servicios, clientes, 
               {profesionales.map((p: any) => <option key={p.id_profesional} value={p.id_profesional}>{p.nombre}</option>)}
             </select>
           </div>
-
-          {/* Servicio */}
           <div>
             <label className="text-xs text-[var(--text-soft)] mb-1 block">Servicio *</label>
             <select className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.id_servicio} onChange={(e) => set("id_servicio", e.target.value)}>
@@ -211,7 +248,6 @@ function CitaModal({ open, onClose, onSave, profesionales, servicios, clientes, 
             </select>
             {servSel && <p className="text-xs text-[var(--text-soft)] mt-1">₡{Number(servSel.precio).toLocaleString("es-CR")} • {servSel.duracion_min} min</p>}
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-[var(--text-soft)] mb-1 block">Fecha *</label>
@@ -222,16 +258,14 @@ function CitaModal({ open, onClose, onSave, profesionales, servicios, clientes, 
               <input type="time" className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.hora} onChange={(e) => set("hora", e.target.value)} />
             </div>
           </div>
-
           <div>
             <label className="text-xs text-[var(--text-soft)] mb-1 block">Notas (opcional)</label>
-            <textarea className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm resize-none" rows={3} value={form.notas} onChange={(e) => set("notas", e.target.value)} />
+            <textarea className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm resize-none" rows={3} value={form.notas ?? ""} onChange={(e) => set("notas", e.target.value)} />
           </div>
         </div>
-
         <div className="flex gap-2 p-5 border-t border-[var(--border)]">
           <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--bg-soft)]">Cancelar</button>
-          <button onClick={() => onSave(form, inicial?.id_cita)} disabled={loading || !camposCompletos} className="flex-1 py-2 rounded-lg text-sm font-medium text-white" style={{ background: "var(--accent)" }}>
+          <button onClick={() => onSave(form, inicial?.id_cita)} disabled={loading || !camposCompletos} className="flex-1 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
             {loading ? "Guardando..." : esEdicion ? "Reprogramar cita" : "Crear cita"}
           </button>
         </div>
@@ -240,42 +274,61 @@ function CitaModal({ open, onClose, onSave, profesionales, servicios, clientes, 
   );
 }
 
-function ClienteModal({ open, onClose, onSave }: any) {
-  const [nombre, setNombre] = useState("");
-  useEffect(() => { if (!open) setNombre(""); }, [open]);
+// ─── ClienteModal ─────────────────────────────────────────────────────────────
+function ClienteModal({ open, onClose, onSave, loading }: {
+  open: boolean; onClose: () => void; onSave: (form: ClienteForm) => void; loading: boolean;
+}) {
+  const EMPTY: ClienteForm = { nombre: "", email: "", id_whatsapp: "", origen: "manual", portal_habilitado: false };
+  const [form, setForm] = useState<ClienteForm>({ ...EMPTY });
+  useEffect(() => { if (!open) setForm({ ...EMPTY }); }, [open]);
   if (!open) return null;
-
+  const set = (k: keyof ClienteForm, v: string | boolean) => setForm((p) => ({ ...p, [k]: v }));
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-sm p-5">
-        <h2 className="text-sm font-medium mb-4">Nuevo cliente</h2>
-        <input className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm mb-4" placeholder="Nombre del cliente" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm">Cancelar</button>
-          <button onClick={() => nombre.trim() && onSave(nombre.trim())} className="flex-1 py-2 rounded-lg text-sm text-white" style={{ background: "var(--accent)" }}>Guardar</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
+          <h2 className="font-medium text-sm">Nuevo cliente</h2>
+          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]">✕</button>
+        </div>
+        <div className="p-5 flex flex-col gap-4">
+          <div><label className="text-xs text-[var(--text-soft)] mb-1 block">Nombre completo *</label><input className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" placeholder="Ej. Juan Pérez" value={form.nombre} onChange={(e) => set("nombre", e.target.value)} /></div>
+          <div><label className="text-xs text-[var(--text-soft)] mb-1 block">Email</label><input type="email" className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" placeholder="cliente@ejemplo.com" value={form.email} onChange={(e) => set("email", e.target.value)} /></div>
+          <div><label className="text-xs text-[var(--text-soft)] mb-1 block">WhatsApp</label><input type="tel" className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" placeholder="50688888888" value={form.id_whatsapp} onChange={(e) => set("id_whatsapp", e.target.value)} /></div>
+          <div><label className="text-xs text-[var(--text-soft)] mb-1 block">Origen</label>
+            <select className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.origen} onChange={(e) => set("origen", e.target.value)}>
+              <option value="manual">Manual</option><option value="whatsapp">WhatsApp</option><option value="telegram">Telegram</option><option value="web">Web / Portal</option>
+            </select>
+          </div>
+          <div className="flex items-center justify-between bg-[var(--bg-soft)] rounded-lg px-3 py-2">
+            <span className="text-sm">Portal de clientes habilitado</span>
+            <button type="button" onClick={() => set("portal_habilitado", !form.portal_habilitado)} className={`relative w-11 h-6 rounded-full transition-colors ${form.portal_habilitado ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}>
+              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.portal_habilitado ? "translate-x-5.5" : ""}`} />
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-2 p-5 border-t border-[var(--border)]">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--bg-soft)] transition">Cancelar</button>
+          <button onClick={() => onSave(form)} disabled={loading || !form.nombre.trim()} className="flex-1 py-2 rounded-lg text-sm font-medium text-white transition disabled:opacity-40" style={{ background: "var(--accent)" }}>{loading ? "Guardando..." : "Guardar"}</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Utilidad de formato ──────────────────────────────
-function to12h(time: string) {
-  const [h = 0, m = 0] = time.split(':').map(Number);
-  const period = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12}:${m.toString().padStart(2, '0')} ${period}`;
+// ─── VistaAgenda — DnD propio con elementFromPoint ────────────────────────────
+// Cada celda recibe data-slot-id. Al arrastrar, ocultamos temporalmente el
+// ghost para que elementFromPoint detecte el slot debajo del cursor.
+interface DragState {
+  citaId: string;
+  cita: Cita;
+  startX: number;
+  startY: number;
+  moved: boolean;
 }
 
-// ─── VistaAgenda - Versión Final Ajustada según tus comentarios ───────────────
 function VistaAgenda({
-  citas,
-  profesionales,
-  fecha,
-  onCrear,
-  onEditar,
-  horarioSemanal,
-  excepciones,
+  citas, profesionales, fecha, onCrear, onEditar,
+  horarioSemanal, excepciones, onReload, supabase, negocioId,
 }: {
   citas: Cita[];
   profesionales: Profesional[];
@@ -284,90 +337,150 @@ function VistaAgenda({
   onEditar: (cita: Cita) => void;
   horarioSemanal: HorarioDia[];
   excepciones: Excepcion[];
+  onReload: () => void;
+  supabase: any;
+  negocioId: string;
 }) {
-  const currentDate = new Date(fecha + "T12:00:00");
-  const diaSemana = currentDate.getDay();
+  const [ghost, setGhost] = useState<{ x: number; y: number; cita: Cita } | null>(null);
+  const [overSlot, setOverSlot] = useState<string | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+
+  // ── Schedule logic ──────────────────────────────────────────────────────────
+  const diaSemana = new Date(fecha + "T12:00:00").getDay();
   const hoy = new Date().toISOString().split("T")[0];
   const esHoy = fecha === hoy;
-
   const ahora = new Date();
-  const horaActualStr = ahora.getHours().toString().padStart(2, "0") + ":" +
-    ahora.getMinutes().toString().padStart(2, "0");
+  const horaActualStr = ahora.getHours().toString().padStart(2, "0") + ":" + ahora.getMinutes().toString().padStart(2, "0");
 
-  // Feriados Costa Rica
   const hd = new Holidays();
-  hd.init('CR');
+  hd.init("CR");
   const feriadoInfo = hd.isHoliday(new Date(fecha));
   const esFeriado = !!feriadoInfo;
-
   const excepcionHoy = excepciones.find((e) => e.fecha === fecha);
 
-  let horaInicio = "08:00";
-  let horaFin = "20:00";
-  let intervalo = 30;
-  let diaCerrado = false;
-  let motivoCierre = "";
+  let horaInicio = "08:00", horaFin = "20:00", intervalo = 30;
+  let diaCerrado = false, motivoCierre = "";
 
   if (excepcionHoy) {
-    if (excepcionHoy.tipo === "cerrado") {
-      diaCerrado = true;
-      motivoCierre = excepcionHoy.motivo || "Día cerrado";
-    } else {
-      horaInicio = excepcionHoy.hora_inicio || horaInicio;
-      horaFin = excepcionHoy.hora_fin || horaFin;
-      intervalo = excepcionHoy.intervalo_min || intervalo;
-    }
+    if (excepcionHoy.tipo === "cerrado") { diaCerrado = true; motivoCierre = excepcionHoy.motivo || "Día cerrado"; }
+    else { horaInicio = excepcionHoy.hora_inicio || horaInicio; horaFin = excepcionHoy.hora_fin || horaFin; intervalo = excepcionHoy.intervalo_min || intervalo; }
   } else if (esFeriado) {
-    diaCerrado = true;
-    motivoCierre = feriadoInfo[0]?.name || "Feriado nacional";
+    diaCerrado = true; motivoCierre = feriadoInfo?.[0]?.name || "Feriado nacional";
   } else {
-    const horarioNormal = horarioSemanal.find((h) => h.dia_semana === diaSemana);
-    if (horarioNormal && horarioNormal.activo) {
-      horaInicio = horarioNormal.hora_inicio;
-      horaFin = horarioNormal.hora_fin;
-      intervalo = horarioNormal.intervalo_min;
-    }
+    const hn = horarioSemanal.find((h) => h.dia_semana === diaSemana);
+    if (hn?.activo) { horaInicio = hn.hora_inicio; horaFin = hn.hora_fin; intervalo = hn.intervalo_min; }
   }
 
   const allSlots = useMemo(() => {
     if (diaCerrado) return [];
     const arr: string[] = [];
-    let current = new Date(`2026-01-01T${horaInicio}`);
+    let cur = new Date(`2026-01-01T${horaInicio}`);
     const end = new Date(`2026-01-01T${horaFin}`);
-    while (current < end) {
-      arr.push(current.toTimeString().slice(0, 5));
-      current.setMinutes(current.getMinutes() + intervalo);
-    }
+    while (cur < end) { arr.push(cur.toTimeString().slice(0, 5)); cur.setMinutes(cur.getMinutes() + intervalo); }
     return arr;
   }, [horaInicio, horaFin, intervalo, diaCerrado]);
 
   const slots = useMemo(() => {
     if (!esHoy) return allSlots;
-    const [hora = 0, minutos = 0] = horaActualStr.split(":").map(Number);
-    let startHour = hora;
-    let startMin = minutos - 60;
-    if (startMin < 0) {
-      startHour--;
-      startMin += 60;
-    }
-    const horaInicioVisible = `${startHour.toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`;
-    return allSlots.filter(slot => slot >= horaInicioVisible);
+    const [h = 0, m = 0] = horaActualStr.split(":").map(Number);
+    let sH = h, sM = m - 60; if (sM < 0) { sH--; sM += 60; }
+    const desde = `${sH.toString().padStart(2, "0")}:${sM.toString().padStart(2, "0")}`;
+    return allSlots.filter((s) => s >= desde);
   }, [allSlots, esHoy, horaActualStr]);
 
   const citasPorSlot = useMemo(() => {
     const map: Record<string, Cita[]> = {};
     citas.forEach((c) => {
       if (c.fecha !== fecha) return;
-      const citaTime = new Date(`2026-01-01T${c.hora}`);
-      const minutes = Math.floor(citaTime.getMinutes() / intervalo) * intervalo;
-      citaTime.setMinutes(minutes, 0, 0);
-      const slotHora = citaTime.toTimeString().slice(0, 5);
-      const key = `${c.id_profesional}_${fecha}_${slotHora}`;
+      const t = new Date(`2026-01-01T${c.hora}`);
+      t.setMinutes(Math.floor(t.getMinutes() / intervalo) * intervalo, 0, 0);
+      const key = `${c.id_profesional}__${fecha}__${t.toTimeString().slice(0, 5)}`;
       if (!map[key]) map[key] = [];
       map[key].push(c);
     });
     return map;
   }, [citas, fecha, intervalo]);
+
+  // ── Find slot under cursor, hiding ghost first so it doesn't block ──
+  const getSlotAtPoint = useCallback((x: number, y: number): string | null => {
+    const ghostEl = document.getElementById("drag-ghost");
+    if (ghostEl) ghostEl.style.visibility = "hidden";
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    if (ghostEl) ghostEl.style.visibility = "visible";
+    if (!el) return null;
+    let cur: HTMLElement | null = el;
+    while (cur) {
+      const slotId = cur.dataset?.slotId;
+      if (slotId) return slotId;
+      cur = cur.parentElement;
+    }
+    return null;
+  }, []);
+
+  // ── Global pointer listeners ──────────────────────────────────────────────
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const state = dragRef.current;
+      if (!state) return;
+      const dx = e.clientX - state.startX;
+      const dy = e.clientY - state.startY;
+      if (!state.moved && Math.hypot(dx, dy) < 6) return;
+      state.moved = true;
+      setGhost({ x: e.clientX, y: e.clientY, cita: state.cita });
+      setOverSlot(getSlotAtPoint(e.clientX, e.clientY));
+    };
+
+    const onUp = async (e: PointerEvent) => {
+      const state = dragRef.current;
+      if (!state) return;
+      dragRef.current = null;
+      setGhost(null);
+      setOverSlot(null);
+
+      if (!state.moved) {
+        // Short tap = open editor
+        onEditar(state.cita);
+        return;
+      }
+
+      const targetSlotId = getSlotAtPoint(e.clientX, e.clientY);
+      if (!targetSlotId) return;
+
+      const parts = targetSlotId.split("__");
+      if (parts.length < 3) return;
+      const [id_profesional, fechaSlot, horaSlot] = parts as [string, string, string];
+
+      const horaOrig = state.cita.hora.slice(0, 5);
+      if (
+        state.cita.id_profesional === id_profesional &&
+        state.cita.fecha === fechaSlot &&
+        horaOrig === horaSlot
+      ) return;
+
+      const tid = toast.loading("Moviendo cita…");
+      try {
+        const { error } = await supabase.rpc("rpc_reprogramar_cita", {
+          p_id_cita: state.citaId,
+          p_negocio_id: negocioId,
+          p_fecha: fechaSlot,
+          p_hora: horaSlot + ":00",
+          p_id_profesional: id_profesional,
+        });
+        if (error) throw error;
+        toast.success("Cita movida ✨", { id: tid });
+        onReload();
+      } catch (err: any) {
+        toast.error(err?.message || "Error al mover cita", { id: tid });
+      }
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [getSlotAtPoint, onEditar, supabase, negocioId, onReload]);
 
   if (diaCerrado) {
     return (
@@ -379,76 +492,104 @@ function VistaAgenda({
     );
   }
 
+  const isDragging = !!ghost;
+
   return (
     <>
-      {/* Indicador "Hoy 08:00 — 20:00" al lado del selector de fecha */}
-
+      {/* Ghost chip that follows cursor */}
+      {ghost && (
+        <div
+          id="drag-ghost"
+          style={{
+            position: "fixed",
+            left: ghost.x + 14,
+            top: ghost.y - 18,
+            zIndex: 9999,
+            pointerEvents: "none",
+            background: ghost.cita.color_hex || "#6366f1",
+            transform: "rotate(2deg) scale(1.06)",
+            minWidth: 120,
+          }}
+          className="rounded-xl px-3 py-2 text-xs text-white shadow-2xl select-none"
+        >
+          <div className="font-semibold truncate">{ghost.cita.nombre_cliente}</div>
+          <div className="opacity-80 text-[10px] truncate">{ghost.cita.nombre_servicio}</div>
+        </div>
+      )}
 
       {/* DESKTOP */}
-      <div className="hidden lg:block overflow-x-auto pb-6">
+      <div
+        className="hidden lg:block overflow-x-auto pb-6"
+        style={{ userSelect: isDragging ? "none" : undefined, cursor: isDragging ? "grabbing" : undefined }}
+      >
         <div className="min-w-max border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--bg)] shadow-sm">
-          <div
-            className="grid bg-[var(--bg-soft)] border-b border-[var(--border)] sticky top-0 z-10"
-            style={{ gridTemplateColumns: `175px repeat(${slots.length}, 120px)` }}
-          >
-            <div className="p-5 border-r border-[var(--border)]">
-              <div className="text-xs font-medium text-[var(--text-soft)] uppercase tracking-wide">Profesionales</div>
+          {/* Header */}
+          <div className="grid bg-[var(--bg-soft)] border-b border-[var(--border)]" style={{ gridTemplateColumns: `180px repeat(${slots.length}, 120px)` }}>
+            <div className="p-4 border-r border-[var(--border)]">
+              <span className="text-[10px] font-semibold text-[var(--text-soft)] uppercase tracking-widest">Profesional</span>
             </div>
             {slots.map((slot) => (
-              <div
-                key={slot}
-                className="text-xs text-[var(--text-soft)] text-center py-4 border-l border-[var(--border)] font-medium"
-              >
-                {slot}
-              </div>
+              <div key={slot} className="py-3 text-[11px] text-center text-[var(--text-soft)] border-l border-[var(--border)] font-medium tabular-nums">{slot}</div>
             ))}
           </div>
 
-          {profesionales.map((p) => (
-            <div
-              key={p.id_profesional}
-              className="grid border-b last:border-b-0"
-              style={{ gridTemplateColumns: `175px repeat(${slots.length}, 120px)` }}
-            >
-
-              <div className="p-5 border-r border-[var(--border)] bg-[var(--bg-soft)] sticky left-0 z-10">
-                <div className="text-sm font-semibold">{p.nombre}</div>
-                {p.especialidad?.nombre && (
-                  <div className="text-xs font-normal text-[var(--text-soft)] mt-0.5">
-                    {p.especialidad.nombre}
-                  </div>
-                )}
+          {/* Rows */}
+          {profesionales.map((prof) => (
+            <div key={prof.id_profesional} className="grid border-b last:border-b-0" style={{ gridTemplateColumns: `180px repeat(${slots.length}, 120px)` }}>
+              <div className="p-4 border-r border-[var(--border)] bg-[var(--bg-soft)] flex flex-col justify-center">
+                <span className="text-sm font-semibold leading-tight">{prof.nombre}</span>
+                {prof.especialidad?.nombre && <span className="text-[11px] text-[var(--text-soft)] mt-0.5">{prof.especialidad.nombre}</span>}
               </div>
 
               {slots.map((slot) => {
-                const key = `${p.id_profesional}_${fecha}_${slot}`;
-                const slotCitas = citasPorSlot[key] || [];
-                const sortedCitas = [...slotCitas].sort((a, b) => a.hora.localeCompare(b.hora));
+                const slotId = `${prof.id_profesional}__${fecha}__${slot}`;
+                const slotCitas = citasPorSlot[slotId] || [];
+                const isEmpty = slotCitas.length === 0;
+                const isOver = overSlot === slotId;
 
                 return (
                   <div
                     key={slot}
-                    className="border-l border-[var(--border)] h-[72px] relative cursor-pointer transition group hover:bg-[var(--bg-soft)]/70 p-2 flex flex-col"
-                    onClick={() => sortedCitas.length === 0 && onCrear({ hora: slot, id_profesional: p.id_profesional })}
+                    data-slot-id={slotId}
+                    className="h-[76px] relative border-l border-[var(--border)] p-1.5 flex flex-col gap-1 group transition-colors duration-75"
+                    style={{
+                      background: isOver ? "rgba(99,102,241,0.1)" : undefined,
+                      cursor: isEmpty && !isDragging ? "pointer" : isDragging ? "grabbing" : "default",
+                    }}
+                    onClick={() => { if (!isDragging && isEmpty) onCrear({ hora: slot, id_profesional: prof.id_profesional }); }}
                   >
-                    {sortedCitas.length > 0 ? (
-                      <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto">
-                        {sortedCitas.map((cita) => (
-                          <div
-                            key={cita.id_cita}
-                            onClick={(e) => { e.stopPropagation(); onEditar(cita); }}
-                            className="rounded-xl p-2.5 text-xs text-white shadow flex flex-col justify-between hover:brightness-110 transition-all"
-                            style={{ background: cita.color_hex }}
-                          >
-                            <div className="font-semibold truncate">{cita.nombre_cliente}</div>
-                            <div className="opacity-90 text-[10px] truncate">{cita.nombre_servicio}</div>
-                          </div>
-                        ))}
+                    {slotCitas.map((cita) => {
+                      const isThisDragging = ghost?.cita.id_cita === cita.id_cita;
+                      return (
+                        <div
+                          key={cita.id_cita}
+                          data-slot-id={slotId}
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            dragRef.current = { citaId: cita.id_cita, cita, startX: e.clientX, startY: e.clientY, moved: false };
+                            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                          }}
+                          style={{
+                            background: cita.color_hex || "#6366f1",
+                            opacity: isThisDragging ? 0.25 : 1,
+                            cursor: isDragging ? "grabbing" : "grab",
+                          }}
+                          className="rounded-xl p-2.5 text-xs text-white shadow-md select-none"
+                        >
+                          <div className="font-semibold truncate leading-tight">{cita.nombre_cliente}</div>
+                          <div className="opacity-80 text-[10px] truncate mt-0.5">{cita.nombre_servicio}</div>
+                          <div className="opacity-60 text-[9px] mt-0.5 tabular-nums">{cita.hora.slice(0, 5)}</div>
+                        </div>
+                      );
+                    })}
+                    {isEmpty && !isDragging && (
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <span className="text-xs text-[var(--text-soft)] font-medium">+ Agendar</span>
                       </div>
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                        <span className="text-sm text-[var(--text-soft)] font-medium">+ Agendar</span>
-                      </div>
+                    )}
+                    {isOver && isDragging && (
+                      <div className="absolute inset-0 rounded border-2 border-dashed border-indigo-400 pointer-events-none" />
                     )}
                   </div>
                 );
@@ -459,47 +600,47 @@ function VistaAgenda({
       </div>
 
       {/* MOBILE */}
-      <div className="lg:hidden space-y-8">
+      <div className="lg:hidden space-y-6" style={{ userSelect: isDragging ? "none" : undefined }}>
         {slots.map((slot) => (
           <div key={slot}>
-            <div className="font-semibold text-[var(--accent)] mb-4 text-lg">{slot}</div>
-            <div className="space-y-4">
-              {profesionales.map((p) => {
-                const key = `${p.id_profesional}_${fecha}_${slot}`;
+            <div className="text-base font-bold text-[var(--accent)] mb-3 pl-1">{slot}</div>
+            <div className="space-y-3">
+              {profesionales.map((prof) => {
+                const key = `${prof.id_profesional}__${fecha}__${slot}`;
                 const slotCitas = citasPorSlot[key] || [];
-                const sortedCitas = [...slotCitas].sort((a, b) => a.hora.localeCompare(b.hora));
-
+                const isEmpty = slotCitas.length === 0;
+                const isOver = overSlot === key;
                 return (
                   <div
-                    key={p.id_profesional}
-                    className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-5 cursor-pointer active:scale-[0.98] transition"
-                    onClick={() => sortedCitas.length === 0 && onCrear({ hora: slot, id_profesional: p.id_profesional })}
+                    key={prof.id_profesional}
+                    data-slot-id={key}
+                    className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-4 min-h-[72px] transition-colors"
+                    style={{ background: isOver ? "rgba(99,102,241,0.08)" : undefined }}
+                    onClick={() => { if (!isDragging && isEmpty) onCrear({ hora: slot, id_profesional: prof.id_profesional }); }}
                   >
-                    <div className="mb-3">
-                      <div className="font-medium">{p.nombre}</div>
-                      {p.especialidad?.nombre && (
-                        <div className="text-xs text-[var(--text-soft)] mt-0.5">
-                          {p.especialidad.nombre}
-                        </div>
-                      )}
-                    </div>
-                    {sortedCitas.length > 0 ? (
-                      <div className="space-y-3">
-                        {sortedCitas.map((cita) => (
+                    <div className="text-xs font-medium text-[var(--text-soft)] mb-2">{prof.nombre}</div>
+                    <div className="flex flex-col gap-2">
+                      {slotCitas.map((cita) => {
+                        const isThisDragging = ghost?.cita.id_cita === cita.id_cita;
+                        return (
                           <div
                             key={cita.id_cita}
-                            onClick={(e) => { e.stopPropagation(); onEditar(cita); }}
-                            className="rounded-2xl p-4 text-white text-sm shadow"
-                            style={{ background: cita.color_hex }}
+                            data-slot-id={key}
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              dragRef.current = { citaId: cita.id_cita, cita, startX: e.clientX, startY: e.clientY, moved: false };
+                              (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                            }}
+                            style={{ background: cita.color_hex || "#6366f1", opacity: isThisDragging ? 0.25 : 1 }}
+                            className="rounded-xl p-2.5 text-xs text-white shadow-md select-none cursor-grab"
                           >
-                            <div className="font-semibold">{cita.nombre_cliente}</div>
-                            <div className="opacity-90 text-xs">{cita.nombre_servicio}</div>
+                            <div className="font-semibold truncate">{cita.nombre_cliente}</div>
+                            <div className="opacity-80 text-[10px] truncate">{cita.nombre_servicio}</div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-[var(--text-soft)]">Libre — Toca para agendar</div>
-                    )}
+                        );
+                      })}
+                      {isEmpty && <div className="text-xs text-[var(--text-soft)] opacity-40">Toca para agendar</div>}
+                    </div>
                   </div>
                 );
               })}
@@ -522,25 +663,25 @@ function CitasOperativasPage() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [horarioSemanal, setHorarioSemanal] = useState<HorarioDia[]>([]);
   const [excepciones, setExcepciones] = useState<Excepcion[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "Agendada" | "Reprogramada" | "Cancelada">("todos");
   const [filtroFecha, setFiltroFecha] = useState<"hoy" | "proximas" | "semana" | "mes">("hoy");
   const [filtroProfesional, setFiltroProfesional] = useState<string>("todos");
-
   const [agendaFecha, setAgendaFecha] = useState(new Date().toISOString().split("T")[0]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState<Cita | null>(null);
-  const [vista, setVista] = useState<"lista" | "agenda">("lista");
+  const [vista, setVista] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("vista") || "agenda";
+    return "agenda";
+  });
   const [clienteModalOpen, setClienteModalOpen] = useState(false);
 
-  // Cargar horario y excepciones
+  useEffect(() => { localStorage.setItem("vista", vista); }, [vista]);
+
   useEffect(() => {
     if (!negocio?.id) return;
-
     supabase.from("config_negocio_horario").select("*").eq("negocio_id", negocio.id).then(({ data }) => setHorarioSemanal(data || []));
     supabase.from("config_negocio_excepciones").select("*").eq("negocio_id", negocio.id).then(({ data }) => setExcepciones(data || []));
   }, [negocio?.id]);
@@ -548,25 +689,21 @@ function CitasOperativasPage() {
   const loadCitas = useCallback(async () => {
     if (!negocio?.id) return;
     setLoading(true);
-
     let query = supabase.from("v_citas_operativas").select("*").eq("negocio_id", negocio.id).order("fecha").order("hora");
-
     if (vista === "agenda") {
       query = query.eq("fecha", agendaFecha);
     } else {
       const hoy = new Date().toISOString().split("T")[0] ?? "";
       const manana = new Date(Date.now() + 86400000).toISOString().split("T")[0] ?? "";
       const enUnaSemana = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0] ?? "";
-      const enUnMes = new Date(); enUnMes.setMonth(enUnMes.getMonth() + 1); const enUnMesStr = enUnMes.toISOString().split("T")[0] ?? "";
-
+      const enUnMes = new Date(); enUnMes.setMonth(enUnMes.getMonth() + 1);
+      const enUnMesStr = enUnMes.toISOString().split("T")[0] ?? "";
       if (filtroFecha === "hoy") query = query.eq("fecha", hoy);
       else if (filtroFecha === "proximas") query = query.gte("fecha", manana);
       else if (filtroFecha === "semana") query = query.gte("fecha", manana).lte("fecha", enUnaSemana);
       else if (filtroFecha === "mes") query = query.gte("fecha", manana).lte("fecha", enUnMesStr);
     }
-
     if (filtroProfesional !== "todos") query = query.eq("id_profesional", filtroProfesional);
-
     const { data, error } = await query;
     if (error) toast.error("Error cargando citas");
     else setCitas(data || []);
@@ -576,115 +713,76 @@ function CitasOperativasPage() {
   useEffect(() => {
     if (!negocio?.id) return;
     loadCitas();
-
     supabase.from("profesionales").select("*, especialidad:especialidades(nombre, sector)").eq("negocio_id", negocio.id).eq("activo", true).then(({ data }) => setProfesionales(data || []));
     supabase.from("servicios").select("*").eq("negocio_id", negocio.id).eq("activo", true).then(({ data }) => setServicios(data || []));
-    supabase.from("clientes").select("id_cliente, nombre").eq("negocio_id", negocio.id).then(({ data }) => setClientes(data || []));
+    supabase.from("clientes_negocio").select("cliente_id, nombre, id_whatsapp").eq("negocio_id", negocio.id).then(({ data }) => setClientes(data || []));
   }, [negocio?.id, loadCitas]);
 
-  // Guardar cita
   const handleSave = async (form: CitaForm, id?: string) => {
     if (!negocio?.id) return;
     setSaving(true);
     try {
       if (id) {
-        const { error } = await supabase.rpc("rpc_reprogramar_cita", {
-          p_id_cita: id,
-          p_negocio_id: negocio.id,
-          p_fecha: form.fecha,
-          p_hora: form.hora.length === 5 ? form.hora + ":00" : form.hora,
-          p_id_profesional: form.id_profesional || null,
-          p_id_servicio: form.id_servicio || null,
-          p_notas: form.notas || null,
-        });
+        const { error } = await supabase.rpc("rpc_reprogramar_cita", { p_id_cita: id, p_negocio_id: negocio.id, p_fecha: form.fecha, p_hora: form.hora.length === 5 ? form.hora + ":00" : form.hora, p_id_profesional: form.id_profesional || null, p_id_servicio: form.id_servicio || null, p_notas: form.notas || null });
         if (error) throw error;
         toast.success("Cita reprogramada ✅");
       } else {
-        const { error } = await supabase.rpc("rpc_crear_cita", {
-          p_negocio_id: negocio.id,
-          p_nombre_cliente: form.id_cliente,
-          p_id_profesional: form.id_profesional,
-          p_id_servicio: form.id_servicio,
-          p_fecha: form.fecha,
-          p_hora: form.hora.length === 5 ? form.hora + ":00" : form.hora,
-          p_notas: form.notas || null,
-          p_origen: "portal",
-        });
+        const { error } = await supabase.rpc("rpc_crear_cita", { p_negocio_id: negocio.id, p_id_cliente: form.id_cliente, p_nombre_cliente: clientes.find((c: any) => c.cliente_id === form.id_cliente)?.nombre || "", p_id_profesional: form.id_profesional, p_id_servicio: form.id_servicio, p_fecha: form.fecha, p_hora: form.hora.length === 5 ? form.hora + ":00" : form.hora, p_notas: form.notas || null, p_origen: "portal" });
         if (error) throw error;
         toast.success("Cita creada ✅");
       }
-      setModalOpen(false);
-      setEditando(null);
-      loadCitas();
-    } catch (err: any) {
-      toast.error(err.message || "Error al guardar cita");
-    } finally {
-      setSaving(false);
-    }
+      setModalOpen(false); setEditando(null); loadCitas();
+    } catch (err: any) { toast.error(err.message || "Error al guardar cita"); }
+    finally { setSaving(false); }
+  };
+
+  const handleGuardarCliente = async (form: ClienteForm) => {
+    if (!negocio?.id) return;
+    setSaving(true);
+    try {
+      const nuevoId = genId();
+      const { error } = await supabase.from("clientes_negocio").insert([{ ...form, cliente_id: nuevoId, negocio_id: negocio.id, creado_en: new Date().toISOString(), actualizado_en: new Date().toISOString() }]);
+      if (error) throw error;
+      const { data } = await supabase.from("clientes_negocio").select("cliente_id, nombre, id_whatsapp").eq("negocio_id", negocio.id);
+      setClientes(data || []);
+      setEditando((prev) => prev ? { ...prev, id_cliente: nuevoId } : prev);
+      setClienteModalOpen(false);
+      toast.success("Cliente creado ✅");
+    } catch (err: any) { toast.error(err.message || "Error al crear cliente"); }
+    finally { setSaving(false); }
   };
 
   const handleCancelar = async (id: string) => {
     if (!confirm("¿Cancelar esta cita?")) return;
     try {
-      const { error } = await supabase.rpc("rpc_cancelar_cita", {
-        p_id_cita: id,
-        p_negocio_id: negocio?.id,
-        p_motivo: null,
-      });
+      const { error } = await supabase.rpc("rpc_cancelar_cita", { p_id_cita: id, p_negocio_id: negocio?.id, p_motivo: null });
       if (error) throw error;
-      toast.success("Cita cancelada ✅");
-      loadCitas();
-    } catch (err: any) {
-      toast.error(err.message || "Error al cancelar");
-    }
+      toast.success("Cita cancelada ✅"); loadCitas();
+    } catch (err: any) { toast.error(err.message || "Error al cancelar"); }
   };
 
   const handleCompletar = async (id: string) => {
     if (!confirm("¿Marcar como completada?")) return;
     try {
-      const { error } = await supabase.rpc("rpc_completar_cita", {
-        p_id_cita: id,
-        p_negocio_id: negocio?.id,
-        p_notas_internas: null,
-      });
+      const { error } = await supabase.rpc("rpc_completar_cita", { p_id_cita: id, p_negocio_id: negocio?.id, p_notas_internas: null });
       if (error) throw error;
-      toast.success("Cita completada ✅");
-      loadCitas();
-    } catch (err: any) {
-      toast.error(err.message || "Error al completar");
-    }
-  };
-
-  const handleCrearCliente = async (nombre: string) => {
-    if (!negocio?.id || !nombre) return;
-    const { data, error } = await supabase
-      .from("clientes")
-      .insert({ negocio_id: negocio.id, nombre })
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Error creando cliente");
-      return;
-    }
-    setClientes((prev) => [...prev, data]);
-    setClienteModalOpen(false);
+      toast.success("Cita completada ✅"); loadCitas();
+    } catch (err: any) { toast.error(err.message || "Error al completar"); }
   };
 
   const citasFiltradas = citas.filter((c) => {
     const matchBusq = !busqueda || (c.nombre_cliente ?? "").toLowerCase().includes(busqueda.toLowerCase()) || c.nombre_servicio.toLowerCase().includes(busqueda.toLowerCase());
-    const matchEstado = filtroEstado === "todos" || c.estado === filtroEstado;
-    return matchBusq && matchEstado;
+    return matchBusq && (filtroEstado === "todos" || c.estado === filtroEstado);
   });
 
-  const profesionalesFiltrados = filtroProfesional === "todos" ? profesionales : profesionales.filter(p => p.id_profesional === filtroProfesional);
+  const profesionalesFiltrados = filtroProfesional === "todos" ? profesionales : profesionales.filter((p) => p.id_profesional === filtroProfesional);
   const diaHoy = new Date(agendaFecha + "T12:00:00").getDay();
   const horarioHoy = horarioSemanal.find((h) => h.dia_semana === diaHoy);
   const horaInicioHoy = horarioHoy?.hora_inicio ?? "08:00";
   const horaFinHoy = horarioHoy?.hora_fin ?? "20:00";
+
   return (
     <div className="p-6 lg:p-8 w-full max-w-7xl mx-auto flex flex-col gap-6">
-      {/* Header y botones de vista (igual que antes) */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-medium">Citas Operativas</h1>
@@ -698,7 +796,6 @@ function CitasOperativasPage() {
         <button onClick={() => setVista("agenda")} className={`px-4 py-2 rounded-xl text-sm ${vista === "agenda" ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-soft)]"}`}>Agenda (calendario)</button>
       </div>
 
-      {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3 items-center">
         <input className="flex-1 bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm" placeholder="Buscar cliente o servicio..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value as any)} className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm">
@@ -711,23 +808,25 @@ function CitasOperativasPage() {
           <option value="todos">Todos los profesionales</option>
           {profesionales.map((p) => <option key={p.id_profesional} value={p.id_profesional}>{p.nombre}</option>)}
         </select>
-        {vista === "lista" && <select value={filtroFecha} onChange={(e) => setFiltroFecha(e.target.value as any)} className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm">...</select>}
+        {vista === "lista" && (
+          <select value={filtroFecha} onChange={(e) => setFiltroFecha(e.target.value as any)} className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm">
+            <option value="hoy">Hoy</option>
+            <option value="proximas">Próximas</option>
+            <option value="semana">Esta semana</option>
+            <option value="mes">Este mes</option>
+          </select>
+        )}
         {vista === "agenda" && (
           <>
-            <input
-              type="date"
-              value={agendaFecha}
-              onChange={(e) => setAgendaFecha(e.target.value)}
-              className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm [color-scheme:light] dark:[color-scheme:dark]"
-            />
+            <DatePickerCustom value={agendaFecha} onChange={setAgendaFecha} />
             <span className="whitespace-nowrap bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm font-medium">
-              {agendaFecha === new Date().toISOString().split("T")[0] ? "Hoy" : new Date(agendaFecha + "T12:00:00").toLocaleDateString("es-CR", { weekday: "short", day: "numeric", month: "short" })} · {to12h(horaInicioHoy)} — {to12h(horaFinHoy)}
+              {agendaFecha === new Date().toISOString().split("T")[0] ? "Hoy" : new Date(agendaFecha + "T12:00:00").toLocaleDateString("es-CR", { weekday: "short", day: "numeric", month: "short" })}
+              {" · "}{to12h(horaInicioHoy)} — {to12h(horaFinHoy)}
             </span>
           </>
         )}
       </div>
 
-      {/* Contenido principal */}
       {loading ? (
         <div className="py-20 text-center text-[var(--text-soft)]">Cargando...</div>
       ) : vista === "lista" ? (
@@ -741,6 +840,9 @@ function CitasOperativasPage() {
           fecha={agendaFecha ?? ""}
           horarioSemanal={horarioSemanal}
           excepciones={excepciones}
+          supabase={supabase}
+          negocioId={negocio?.id ?? ""}
+          onReload={loadCitas}
           onCrear={({ hora, id_profesional }) => {
             setEditando({ id_cita: "", id_cliente: "", id_profesional, id_servicio: "", fecha: agendaFecha, hora, nombre_profesional: "", nombre_servicio: "", color_hex: "", precio: 0, estado: "Agendada", duracion_min: 0 } as Cita);
             setModalOpen(true);
@@ -750,8 +852,7 @@ function CitasOperativasPage() {
       )}
 
       <CitaModal open={modalOpen} onClose={() => { setModalOpen(false); setEditando(null); }} onSave={handleSave} profesionales={profesionales} servicios={servicios} clientes={clientes} onCrearCliente={() => setClienteModalOpen(true)} inicial={editando ? { ...editando, hora: editando.hora?.slice(0, 5) } : undefined} loading={saving} />
-
-      <ClienteModal open={clienteModalOpen} onClose={() => setClienteModalOpen(false)} onSave={handleCrearCliente} />
+      <ClienteModal open={clienteModalOpen} onClose={() => setClienteModalOpen(false)} onSave={handleGuardarCliente} loading={saving} />
     </div>
   );
 }
