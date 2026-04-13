@@ -141,6 +141,109 @@ function formatHora(hora: string) {
   return date.toLocaleTimeString("es-CR", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+function CitaDetailModal({ open, onClose, cita, onReprogramar, onCancelar, onCompletar, loading }: {
+  open: boolean;
+  onClose: () => void;
+  cita: Cita | null;
+  onReprogramar: (c: Cita) => void;
+  onCancelar: (id: string) => void;
+  onCompletar: (id: string) => void;
+  loading?: boolean;
+}) {
+  if (!open || !cita) return null;
+  const puedeCancelar = cita.estado !== "Cancelada" && cita.estado !== "Completada";
+  const puedeCompletar = cita.estado !== "Completada" && cita.estado !== "Cancelada";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-sm shadow-2xl">
+        {/* Header con color del servicio */}
+        <div className="h-1.5 rounded-t-2xl" style={{ background: cita.color_hex || "var(--accent)" }} />
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[var(--border)]">
+          <div>
+            <p className="font-semibold text-base leading-tight">{cita.nombre_cliente}</p>
+            <p className="text-xs text-[var(--text-soft)] mt-0.5">{formatFecha(cita.fecha)} · {formatHora(cita.hora)}</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]">✕</button>
+        </div>
+
+        {/* Info */}
+        <div className="px-5 py-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <EstadoBadge estado={cita.estado} />
+            <span className="text-sm font-medium">₡{Number(cita.precio).toLocaleString("es-CR")}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-[var(--bg-soft)] rounded-xl px-3 py-2.5">
+              <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">Servicio</p>
+              <p className="text-sm font-medium leading-tight">{cita.nombre_servicio}</p>
+              <p className="text-xs text-[var(--text-soft)]">{cita.duracion_min} min</p>
+            </div>
+            <div className="bg-[var(--bg-soft)] rounded-xl px-3 py-2.5">
+              <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">Profesional</p>
+              <p className="text-sm font-medium leading-tight">{cita.nombre_profesional}</p>
+            </div>
+          </div>
+          {cita.notas && (
+            <div className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-xs text-[var(--text-soft)]">
+              {cita.notas}
+            </div>
+          )}
+        </div>
+
+        {/* Acciones */}
+        <div className="px-5 pb-5 flex flex-col gap-2">
+          {/* Cancelar — prominente y rojo */}
+          {puedeCancelar && (
+            <button
+              onClick={() => { onCancelar(cita.id_cita); onClose(); }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-red-500 hover:bg-red-600 text-white transition"
+            >
+              {/* Ícono basurero SVG */}
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 4h10M6 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1M5 4l.5 9h5L11 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M7 7v4M9 7v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+              Cancelar cita
+            </button>
+          )}
+
+          {/* Completar */}
+          {puedeCompletar && (
+            <button
+              onClick={() => { onCompletar(cita.id_cita); onClose(); }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition"
+            >
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 8.5l3.5 3.5 6.5-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Marcar como completada
+            </button>
+          )}
+
+          {/* Reprogramar */}
+          <button
+            onClick={() => { onReprogramar(cita); onClose(); }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition"
+          >
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 8a6 6 0 1 0 6-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              <path d="M2 4v4h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Reprogramar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+
 // ─── CitaCard ─────────────────────────────────────────────────────────────────
 function CitaCard({ cita, onReprogramar, onCancelar, onCompletar }: {
   cita: Cita; onReprogramar: (c: Cita) => void; onCancelar: (id: string) => void; onCompletar: (id: string) => void;
@@ -657,6 +760,9 @@ function CitasOperativasPage() {
   const supabase = createClient();
   const { negocio } = useNegocio();
 
+  const [detailCita, setDetailCita] = useState<Cita | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
   const [clientes, setClientes] = useState<any[]>([]);
   const [citas, setCitas] = useState<Cita[]>([]);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
@@ -847,12 +953,21 @@ function CitasOperativasPage() {
             setEditando({ id_cita: "", id_cliente: "", id_profesional, id_servicio: "", fecha: agendaFecha, hora, nombre_profesional: "", nombre_servicio: "", color_hex: "", precio: 0, estado: "Agendada", duracion_min: 0 } as Cita);
             setModalOpen(true);
           }}
-          onEditar={(cita) => { setEditando(cita); setModalOpen(true); }}
+          onEditar={(cita) => { setDetailCita(cita); setDetailOpen(true); }}
         />
       )}
 
       <CitaModal open={modalOpen} onClose={() => { setModalOpen(false); setEditando(null); }} onSave={handleSave} profesionales={profesionales} servicios={servicios} clientes={clientes} onCrearCliente={() => setClienteModalOpen(true)} inicial={editando ? { ...editando, hora: editando.hora?.slice(0, 5) } : undefined} loading={saving} />
+
       <ClienteModal open={clienteModalOpen} onClose={() => setClienteModalOpen(false)} onSave={handleGuardarCliente} loading={saving} />
+      <CitaDetailModal
+        open={detailOpen}
+        onClose={() => { setDetailOpen(false); setDetailCita(null); }}
+        cita={detailCita}
+        onReprogramar={(c) => { setEditando(c); setModalOpen(true); }}
+        onCancelar={handleCancelar}
+        onCompletar={handleCompletar}
+      />
     </div>
   );
 }
