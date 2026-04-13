@@ -23,6 +23,7 @@
   ],
   "dependencies": {
     "@serwist/next": "^9.5.7",
+    "date-holidays": "^3.27.0",
     "next": "^16.2.3",
     "serwist": "^9.5.7"
   }
