@@ -1301,7 +1301,7 @@ function CitasOperativasPage() {
         const map: Record<string, string[]> = {};
         (data || []).forEach((row: any) => {
           if (!map[row.servicio_id]) map[row.servicio_id] = [];
-          map[row.servicio_id].push(row.profesional_id);
+          map[row.servicio_id]!.push(row.profesional_id);
         });
         setProfesionalServiciosMap(map);
       });
