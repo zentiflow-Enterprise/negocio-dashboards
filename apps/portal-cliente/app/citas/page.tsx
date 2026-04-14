@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import Holidays from "date-holidays";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
+import { CalendarX2, CalendarOff, Inbox, SearchX, Ghost } from "lucide-react";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Cita {
@@ -507,6 +508,8 @@ interface DragState {
   moved: boolean;
 }
 
+
+
 function VistaAgenda({
   citas, profesionales, fecha, onCrear, onEditar,
   horarioSemanal, excepciones, onReload, supabase, negocioId,
@@ -707,10 +710,10 @@ function VistaAgenda({
           {/* Header */}
           <div className="grid bg-[var(--bg-soft)] border-b border-[var(--border)]" style={{ gridTemplateColumns: `180px repeat(${slots.length}, 120px)` }}>
             <div className="p-4 border-r border-[var(--border)]">
-              <span className="text-[10px] font-semibold text-[var(--text-soft)] uppercase tracking-widest">Profesional</span>
+              <span className="text-sm font-semibold text-[var(--text-soft)] uppercase tracking-widest">Profesional</span>
             </div>
             {slots.map((slot) => (
-              <div key={slot} className="py-3 text-[11px] text-center text-[var(--text-soft)] border-l border-[var(--border)] font-medium tabular-nums">{slot}</div>
+              <div key={slot} className="py-3 text-[13px] text-center text-[var(--text-soft)] border-l border-[var(--border)] font-medium tabular-nums">{to12h(slot)}</div>
             ))}
           </div>
 
@@ -718,7 +721,7 @@ function VistaAgenda({
           {profesionales.map((prof) => (
             <div key={prof.id_profesional} className="grid border-b last:border-b-0" style={{ gridTemplateColumns: `180px repeat(${slots.length}, 120px)` }}>
               <div className="p-4 border-r border-[var(--border)] bg-[var(--bg-soft)] flex flex-col justify-center">
-                <span className="text-sm font-semibold leading-tight">{prof.nombre}</span>
+                <span className="text-base font-semibold leading-tight">{prof.nombre}</span>
                 {prof.especialidad?.nombre && <span className="text-[11px] text-[var(--text-soft)] mt-0.5">{prof.especialidad.nombre}</span>}
               </div>
 
@@ -760,7 +763,7 @@ function VistaAgenda({
                         >
                           <div className="font-semibold truncate leading-tight">{cita.nombre_cliente}</div>
                           <div className="opacity-80 text-[10px] truncate mt-0.5">{cita.nombre_servicio}</div>
-                          <div className="opacity-60 text-[9px] mt-0.5 tabular-nums">{cita.hora.slice(0, 5)}</div>
+                          <div className="opacity-60 text-[11px] mt-0.5 tabular-nums">{to12h(cita.hora.slice(0, 5))}</div>
                         </div>
                       );
                     })}
@@ -784,7 +787,7 @@ function VistaAgenda({
       <div className="lg:hidden space-y-6" style={{ userSelect: isDragging ? "none" : undefined }}>
         {slots.map((slot) => (
           <div key={slot}>
-            <div className="text-base font-bold text-[var(--accent)] mb-3 pl-1">{slot}</div>
+            <div className="text-lg font-bold text-[var(--accent)] mb-3 pl-1">{to12h(slot)}</div>
             <div className="space-y-3">
               {profesionales.map((prof) => {
                 const key = `${prof.id_profesional}__${fecha}__${slot}`;
@@ -856,10 +859,12 @@ function CitasOperativasPage() {
   const [agendaFecha, setAgendaFecha] = useState(new Date().toISOString().split("T")[0]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState<Cita | null>(null);
-  const [vista, setVista] = useState(() => {
-    if (typeof window !== "undefined") return localStorage.getItem("vista") || "agenda";
-    return "agenda";
-  });
+  const [vista, setVista] = useState<"lista" | "agenda">("agenda");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("vista") as "lista" | "agenda" | null;
+    if (saved) setVista(saved);
+  }, []);
   const [clienteModalOpen, setClienteModalOpen] = useState(false);
 
   const [confirm, setConfirm] = useState<{
@@ -1020,7 +1025,11 @@ function CitasOperativasPage() {
         <input className="flex-1 bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm" placeholder="Buscar cliente o servicio..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         {/* Contador — siempre visible en ambas vistas */}
         <div className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm font-medium tabular-nums whitespace-nowrap">
-          {citas.filter(c => c.estado !== "Cancelada").length} citas · ₡{citas.filter(c => c.estado !== "Cancelada").reduce((acc, c) => acc + Number(c.precio), 0).toLocaleString("es-CR")}
+          {citas.filter(c => c.estado !== "Cancelada").length} citas · ₡
+          {citas
+            .filter(c => c.estado !== "Cancelada")
+            .reduce((acc, c) => acc + (Number(c.precio) || 0), 0)
+            .toLocaleString("es-CR")}
         </div>
 
         {vista === "lista" && (
@@ -1060,7 +1069,14 @@ function CitasOperativasPage() {
         <div className="py-20 text-center text-[var(--text-soft)]">Cargando...</div>
       ) : vista === "lista" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {citasFiltradas.map((cita) => <CitaCard key={cita.id_cita} cita={cita} onReprogramar={(c) => { setEditando(c); setModalOpen(true); }} onCancelar={handleCancelar} onCompletar={handleCompletar} />)}
+          {citasFiltradas.length === 0 ? (
+            <div className="col-span-full flex flex-col items-center justify-center py-20 text-[var(--text-soft)]">
+              <CalendarX2 className="w-10 h-10 mb-3 opacity-40" />
+              <p className="text-sm font-medium">No hay citas para este filtro</p>
+            </div>
+          ) : (
+            citasFiltradas.map((cita) => <CitaCard key={cita.id_cita} cita={cita} onReprogramar={(c) => { setEditando(c); setModalOpen(true); }} onCancelar={handleCancelar} onCompletar={handleCompletar} />)
+          )}
         </div>
       ) : (
         <VistaAgenda
