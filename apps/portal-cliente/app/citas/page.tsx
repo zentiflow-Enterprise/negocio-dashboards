@@ -179,7 +179,7 @@ function DatePickerCustom({
             <DayPicker
               mode="single"
               selected={value ? (() => {
-                const [y, m, d] = value.split("-").map(Number);
+                const [y = 0, m = 1, d = 1] = value.split("-").map(Number);
                 return new Date(y, m - 1, d);
               })() : undefined}
               onSelect={(date) => {
@@ -210,8 +210,6 @@ function DatePickerCustom({
     </div>
   );
 }
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 
 // ─── Helpers para slots dinámicos ─────────────────────────────────────────────
 function timeToMinutes(time: string): number {
@@ -626,10 +624,9 @@ function CitaModal({
 
   useEffect(() => {
     if (availableSlots.length > 0 && (!form.hora || !availableSlots.includes(form.hora))) {
-      set("hora", availableSlots[0]);
+      set("hora", availableSlots[0] ?? "");
     }
   }, [availableSlots]);
-
   const camposCompletos = !!form.id_cliente && !!form.id_profesional && !!form.id_servicio && !!form.fecha && !!form.hora;
   const isFechaDisabled = !form.id_profesional;
 

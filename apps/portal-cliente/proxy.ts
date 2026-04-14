@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
     let res = NextResponse.next();
 
     const supabase = createServerClient(
@@ -36,7 +36,6 @@ export async function middleware(req: NextRequest) {
 
     return res;
 }
-
 
 export const config = {
     matcher: ["/", "/dashboard/:path*"],

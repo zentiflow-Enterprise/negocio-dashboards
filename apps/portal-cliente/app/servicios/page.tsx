@@ -85,23 +85,24 @@ function ServicioCard({
   return (
     <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl flex flex-col gap-3 p-4 hover:border-[var(--accent)]/40 transition-all duration-150 h-full">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <ColorDot color={servicio.color_hex} />
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm leading-tight truncate">{servicio.nombre}</p>
-            <p className="text-[11px] text-[var(--text-soft)] mt-0.5">
-              {servicio.duracion_min} min • ₡{Number(servicio.precio).toLocaleString("es-CR")}
-            </p>
+      <div className="flex flex-col gap-2">
+        {/* Fila 1: Color + Nombre + Badge */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <ColorDot color={servicio.color_hex} />
+            <p className="font-medium text-sm leading-tight line-clamp-2">{servicio.nombre}</p>
           </div>
+          <ActiveBadge activo={servicio.activo} />
         </div>
 
-        {/* Estado y botón Editar en la misma línea */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <ActiveBadge activo={servicio.activo} />
+        {/* Fila 2: Duración + Precio + Botón Editar */}
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] text-[var(--text-soft)]">
+            {servicio.duracion_min} min • ₡{Number(servicio.precio).toLocaleString("es-CR")}
+          </p>
           <button
             onClick={() => onEdit(servicio)}
-            className="px-2.5 py-1 rounded-lg text-[11px] border border-[var(--border)] hover:bg-[var(--bg-soft)] transition whitespace-nowrap"
+            className="px-2.5 py-1 rounded-lg text-[11px] border border-[var(--border)] hover:bg-[var(--bg-soft)] transition whitespace-nowrap flex-shrink-0"
           >
             Editar
           </button>
@@ -122,7 +123,7 @@ function ServicioCard({
   );
 }
 
-// ─── Modal (sin cambios importantes) ──────────────────────────────────────────
+// ─── Modal ──────────────────────────────────────────
 function ServicioModal({
   open,
   onClose,
@@ -424,7 +425,7 @@ function ServiciosPage() {
         </div>
       ) : filtrados.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl">
-          <span className="text-4xl opacity-30">✂️</span>
+          <span className="text-4xl opacity-30"></span>
           <p className="text-sm text-[var(--text-soft)]">No se encontraron servicios</p>
           {busqueda && (
             <button

@@ -11,14 +11,12 @@ interface Profesional {
   id_profesional: string;
   negocio_id: string;
   nombre: string;
-  email: string;
-  telefono: string;
-  foto_url: string;
-  id_turno: string;
+  email: string | null;
+  telefono: string | null;
+  id_turno: string | null;
   activo: boolean;
   creado_en: string;
 }
-
 interface Turno {
   id_turno: string;
   nombre_turno: string;
@@ -32,7 +30,6 @@ interface ProfesionalForm {
   nombre: string;
   email: string;
   telefono: string;
-  foto_url: string;
   id_turno: string;
   activo: boolean;
 }
@@ -41,7 +38,6 @@ const FORM_EMPTY: ProfesionalForm = {
   nombre: "",
   email: "",
   telefono: "",
-  foto_url: "",
   id_turno: "",
   activo: true,
 };
@@ -95,6 +91,18 @@ function ActiveBadge({ activo }: { activo: boolean }) {
     </span>
   );
 }
+function profesionalToForm(p: Profesional): ProfesionalForm & { id_profesional: string } {
+  return {
+    id_profesional: p.id_profesional,
+    nombre: p.nombre ?? "",
+    email: p.email ?? "",
+    telefono: p.telefono ?? "",
+    id_turno: p.id_turno ?? "",
+    activo: p.activo,
+  };
+}
+
+
 
 // ─── Tarjeta Profesional (compacta) ───────────────────────────────────────────
 function ProfesionalCard({
@@ -109,23 +117,24 @@ function ProfesionalCard({
   return (
     <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl flex flex-col gap-3 p-4 hover:border-[var(--accent)]/40 transition-all duration-150 h-full">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <Avatar nombre={profesional.nombre} foto_url={profesional.foto_url} />
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm leading-tight truncate">{profesional.nombre}</p>
-            <p className="text-[11px] text-[var(--text-soft)] mt-0.5">
-              {profesional.email || "Sin email"}
-            </p>
+      <div className="flex flex-col gap-2">
+        {/* Fila 1: Avatar + Nombre + Badge */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Avatar nombre={profesional.nombre} />
+            <p className="font-medium text-sm leading-tight line-clamp-2">{profesional.nombre}</p>
           </div>
+          <ActiveBadge activo={profesional.activo} />
         </div>
 
-        {/* Estado + Editar */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <ActiveBadge activo={profesional.activo} />
+        {/* Fila 2: Email + Botón Editar */}
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] text-[var(--text-soft)] truncate flex-1 min-w-0">
+            {profesional.email || "Sin email"}
+          </p>
           <button
             onClick={() => onEdit(profesional)}
-            className="px-2.5 py-1 rounded-lg text-[11px] border border-[var(--border)] hover:bg-[var(--bg-soft)] transition whitespace-nowrap"
+            className="px-2.5 py-1 rounded-lg text-[11px] border border-[var(--border)] hover:bg-[var(--bg-soft)] transition whitespace-nowrap flex-shrink-0"
           >
             Editar
           </button>
@@ -151,7 +160,6 @@ function ProfesionalCard({
     </div>
   );
 }
-
 // ─── Modal (sin cambios mayores) ──────────────────────────────────────────────
 function ProfesionalModal({
   open,
@@ -201,7 +209,7 @@ function ProfesionalModal({
 
         <div className="p-5 flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <Avatar nombre={form.nombre || "?"} foto_url={form.foto_url} />
+            <Avatar nombre={form.nombre || "?"} />
             <span className="text-sm text-[var(--text-soft)]">
               {form.nombre || "Nombre del profesional"}
             </span>
@@ -224,7 +232,7 @@ function ProfesionalModal({
                 type="email"
                 className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
                 placeholder="correo@ejemplo.com"
-                value={form.email}
+                value={form.email ?? ""}
                 onChange={(e) => set("email", e.target.value)}
               />
             </div>
@@ -234,21 +242,13 @@ function ProfesionalModal({
                 type="tel"
                 className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
                 placeholder="8888-8888"
-                value={form.telefono}
+                value={form.telefono ?? ""}
                 onChange={(e) => set("telefono", e.target.value)}
               />
             </div>
           </div>
 
-          <div>
-            <label className="text-xs text-[var(--text-soft)] mb-1 block">URL de foto (opcional)</label>
-            <input
-              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
-              placeholder="https://..."
-              value={form.foto_url}
-              onChange={(e) => set("foto_url", e.target.value)}
-            />
-          </div>
+
 
           <div>
             <label className="text-xs text-[var(--text-soft)] mb-1 block">Turno asignado</label>
@@ -466,7 +466,7 @@ function ProfesionalesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
           {filtrados.map((p) => {
-            const turnoNombre = getTurnoNombre(p.id_turno);
+            const turnoNombre = getTurnoNombre(p.id_turno ?? "");
             return (
               <ProfesionalCard
                 key={p.id_profesional}
@@ -486,7 +486,7 @@ function ProfesionalesPage() {
         onSave={handleSave}
         onDelete={handleDelete}
         turnos={turnos}
-        inicial={editando || undefined}
+        inicial={editando ? profesionalToForm(editando) : undefined}
         loading={saving}
       />
     </div>
