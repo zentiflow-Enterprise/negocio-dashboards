@@ -1443,7 +1443,7 @@ function CitasOperativasPage() {
         )}
         {vista === "agenda" && (
           <>
-            <DatePickerCustom value={agendaFecha} onChange={setAgendaFecha} />
+            <DatePickerCustom value={agendaFecha ?? ""} onChange={setAgendaFecha} />
             <span className="whitespace-nowrap bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm font-medium">
               {agendaFecha === new Date().toISOString().split("T")[0] ? "Hoy" : new Date(agendaFecha + "T12:00:00").toLocaleDateString("es-CR", { weekday: "short", day: "numeric", month: "short" })}
               {" · "}{to12h(horaInicioHoy)} — {to12h(horaFinHoy)}
