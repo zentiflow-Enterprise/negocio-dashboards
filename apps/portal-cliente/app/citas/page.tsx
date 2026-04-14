@@ -6,7 +6,9 @@ import { useNegocio } from "@/lib/hooks/useNegocio";
 import DashboardLayout from "../dashboard/layout";
 import toast from "react-hot-toast";
 import Holidays from "date-holidays";
+import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
+import { es } from "react-day-picker/locale";
 import "react-day-picker/dist/style.css";
 import { CalendarX2, CalendarOff, Inbox, SearchX, Ghost } from "lucide-react";
 
@@ -99,35 +101,211 @@ function to12h(time: string) {
 }
 
 // ─── DatePicker ───────────────────────────────────────────────────────────────
-function DatePickerCustom({ value, onChange }: any) {
+function DatePickerCustom({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (date: string) => void;
+  disabled?: boolean;
+}) {
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [pickerPosition, setPickerPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  // Formato EXACTO que querías: "jueves 16 de abril, 2026"
+  const formatFechaLegible = (fecha: string): string => {
+    if (!fecha) return "Seleccionar fecha";
+    // Parsear manualmente para evitar conversión UTC → local
+    const [year, month, day] = fecha.split("-").map(Number);
+    const date = new Date(year, month - 1, day); // mes es 0-indexado
+    let formatted = new Intl.DateTimeFormat("es-ES", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(date);
+
+    formatted = formatted.replace(/^(\w+), /, "$1 ");
+    formatted = formatted.replace(/ de (\d{4})$/, ", $1");
+    return formatted;
+  };
+
+  const handleOpen = () => {
+    if (disabled) return;
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPickerPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+    setOpen(true);
+  };
+
+  const closePicker = () => setOpen(false);
+
   return (
     <div className="relative">
-      <button onClick={() => setOpen(!open)} className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm w-full text-left">
-        📅 {value === new Date().toISOString().split("T")[0] ? "Hoy" : value}
+      <button
+        ref={buttonRef}
+        onClick={handleOpen}
+        disabled={disabled}
+        className={`w-full text-left flex items-center gap-2 px-4 py-3 text-sm border rounded-2xl transition-all ${disabled
+          ? "bg-[var(--bg-soft)] border-[var(--border)] opacity-50 cursor-not-allowed"
+          : "bg-[var(--bg-soft)] border-[var(--border)] hover:border-[var(--accent)]"
+          }`}
+      >
+        📅 <span className={value ? "text-[var(--text)]" : "text-[var(--text-soft)]"}>
+          {formatFechaLegible(value)}
+        </span>
       </button>
-      {open && (
-        <div className="absolute z-50 mt-2 bg-[var(--bg)] border border-[var(--border)] rounded-xl p-3 shadow-xl">
-          <DayPicker
-            mode="single"
-            selected={value ? new Date(value + "T12:00:00") : undefined}
-            onSelect={(date) => {
-              if (!date) return;
-              const formatted = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split("T")[0];
-              onChange(formatted);
-              setOpen(false);
+
+      {/* Portal con posicionamiento exacto */}
+      {open &&
+        pickerPosition &&
+        createPortal(
+          <div
+            className="fixed z-[9999] bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-4 shadow-2xl"
+            style={{
+              top: `${pickerPosition.top}px`,
+              left: `${pickerPosition.left}px`,
+              width: `${pickerPosition.width}px`,
             }}
-          />
-        </div>
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DayPicker
+              mode="single"
+              selected={value ? (() => {
+                const [y, m, d] = value.split("-").map(Number);
+                return new Date(y, m - 1, d);
+              })() : undefined}
+              onSelect={(date) => {
+                if (!date) return;
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, "0");
+                const day = String(date.getDate()).padStart(2, "0");
+                const formatted = `${year}-${month}-${day}`;
+                onChange(formatted);
+                setOpen(false);
+              }}
+              disabled={{ before: new Date() }}
+              locale={es}
+              weekStartsOn={1}
+              className="react-day-picker"
+            />
+          </div>,
+          document.body
+        )}
+
+      {/* Click fuera para cerrar */}
+      {open && (
+        <div
+          className="fixed inset-0 z-[9998]"
+          onClick={closePicker}
+        />
       )}
     </div>
   );
 }
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 
+// ─── Helpers para slots dinámicos ─────────────────────────────────────────────
+function timeToMinutes(time: string): number {
+  const [h = 0, m = 0] = time.split(":").map(Number);
+  return h * 60 + m;
+}
 
+function getAvailableTimeSlots({
+  fecha,
+  id_profesional,
+  duracion_min,
+  horarioSemanal,
+  excepciones,
+  citas,
+}: {
+  fecha: string;
+  id_profesional: string;
+  duracion_min: number;
+  horarioSemanal: HorarioDia[];
+  excepciones: Excepcion[];
+  citas: Cita[];
+}): string[] {
+  const diaSemana = new Date(fecha + "T12:00:00").getDay();
+  const hoy = new Date().toISOString().split("T")[0];
+  const esHoy = fecha === hoy;
+  const ahora = new Date();
+  const horaActualStr = ahora.getHours().toString().padStart(2, "0") + ":" + ahora.getMinutes().toString().padStart(2, "0");
+
+  const hd = new Holidays();
+  hd.init("CR");
+  const feriadoInfo = hd.isHoliday(new Date(fecha));
+  const esFeriado = !!feriadoInfo;
+
+  const excepcionHoy = excepciones.find((e) => e.fecha === fecha);
+
+  let horaInicio = "08:00";
+  let horaFin = "20:00";
+  let intervalo = 30;
+  let diaCerrado = false;
+
+  if (excepcionHoy) {
+    if (excepcionHoy.tipo === "cerrado") return [];
+    horaInicio = excepcionHoy.hora_inicio || horaInicio;
+    horaFin = excepcionHoy.hora_fin || horaFin;
+    intervalo = excepcionHoy.intervalo_min || intervalo;
+  } else if (esFeriado) {
+    return [];
+  } else {
+    const hn = horarioSemanal.find((h) => h.dia_semana === diaSemana);
+    if (hn?.activo) {
+      horaInicio = hn.hora_inicio;
+      horaFin = hn.hora_fin;
+      intervalo = hn.intervalo_min;
+    }
+  }
+
+  // Generar todos los slots posibles según el intervalo del negocio
+  const allSlots: string[] = [];
+  let cur = new Date(`2026-01-01T${horaInicio}`);
+  const end = new Date(`2026-01-01T${horaFin}`);
+  while (cur < end) {
+    allSlots.push(cur.toTimeString().slice(0, 5));
+    cur.setMinutes(cur.getMinutes() + intervalo);
+  }
+
+  // Si es hoy, eliminar slots que ya pasaron
+  let candidateSlots = allSlots;
+  if (esHoy) {
+    candidateSlots = allSlots.filter((s) => timeToMinutes(s) >= timeToMinutes(horaActualStr));
+  }
+
+  // Citas del profesional en esa fecha
+  const citasDelProf = citas.filter(
+    (c) => c.fecha === fecha && c.id_profesional === id_profesional
+  );
+
+  // Filtrar slots sin solapamiento
+  const available: string[] = [];
+  for (const slot of candidateSlots) {
+    const slotMin = timeToMinutes(slot);
+    const proposedEndMin = slotMin + duracion_min;
+
+    const overlaps = citasDelProf.some((cita) => {
+      if (!cita.duracion_min) return false;
+      const citaStartMin = timeToMinutes(cita.hora.slice(0, 5));
+      const citaEndMin = citaStartMin + cita.duracion_min;
+      return citaStartMin < proposedEndMin && citaEndMin > slotMin;
+    });
+
+    if (!overlaps) available.push(slot);
+  }
+
+  return available;
+}
 
 function EstadoBadge({ estado }: { estado: string }) {
   const colorClass = ESTADO_COLOR[estado] ?? "bg-gray-500/10 text-gray-400 border-gray-400/20";
@@ -235,10 +413,15 @@ function CitaDetailModal({ open, onClose, cita, onReprogramar, onCancelar, onCom
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-sm shadow-2xl">
+      <div
+        className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header con color del servicio */}
         <div className="h-1.5 rounded-t-2xl" style={{ background: cita.color_hex || "var(--accent)" }} />
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[var(--border)]">
@@ -391,63 +574,218 @@ function ClienteBuscador({ clientes, value, onChange, onCrearCliente }: {
   );
 }
 
-// ─── CitaModal ────────────────────────────────────────────────────────────────
-function CitaModal({ open, onClose, onSave, profesionales, servicios, clientes, onCrearCliente, inicial, loading }: any) {
+
+// ─── CitaModal REDISEÑADO v4 - Fecha perfecta (calendario en español, sin scroll, formato legible) ─────────────────────────────
+function CitaModal({
+  open,
+  onClose,
+  onSave,
+  profesionales,
+  servicios,
+  clientes,
+  onCrearCliente,
+  inicial,
+  loading,
+  horarioSemanal,
+  excepciones,
+  citas,
+  profesionalServiciosMap,
+}: any) {
   const [form, setForm] = useState<CitaForm>({ ...FORM_EMPTY, ...inicial });
-  useEffect(() => { setForm({ ...FORM_EMPTY, ...inicial }); }, [inicial, open]);
-  useEffect(() => { setForm((prev) => ({ ...prev, id_cliente: inicial?.id_cliente || "" })); }, [inicial?.id_cliente]);
-  if (!open) return null;
+  const hoy = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    setForm({ ...FORM_EMPTY, ...inicial });
+  }, [inicial, open]);
+
   const set = (k: keyof CitaForm, v: string) => setForm((p) => ({ ...p, [k]: v }));
-  const servSel = servicios.find((s: any) => s.id_servicio === form.id_servicio);
+
   const esEdicion = !!inicial?.id_cita;
+
+  const compatibleProfesionales = useMemo(() => {
+    if (!form.id_servicio || !profesionalServiciosMap[form.id_servicio]) {
+      return profesionales || [];
+    }
+    const allowedIds = profesionalServiciosMap[form.id_servicio] || [];
+    return (profesionales || []).filter((p: Profesional) => allowedIds.includes(p.id_profesional));
+  }, [form.id_servicio, profesionalServiciosMap, profesionales]);
+
+  const availableSlots = useMemo(() => {
+    if (!form.id_profesional || !form.id_servicio || !form.fecha) return [];
+    const serv = servicios.find((s: Servicio) => s.id_servicio === form.id_servicio);
+    if (!serv) return [];
+    return getAvailableTimeSlots({
+      fecha: form.fecha,
+      id_profesional: form.id_profesional,
+      duracion_min: serv.duracion_min,
+      horarioSemanal,
+      excepciones,
+      citas,
+    });
+  }, [form.id_profesional, form.id_servicio, form.fecha, servicios, horarioSemanal, excepciones, citas]);
+
+  useEffect(() => {
+    if (availableSlots.length > 0 && (!form.hora || !availableSlots.includes(form.hora))) {
+      set("hora", availableSlots[0]);
+    }
+  }, [availableSlots]);
+
   const camposCompletos = !!form.id_cliente && !!form.id_profesional && !!form.id_servicio && !!form.fecha && !!form.hora;
+  const isFechaDisabled = !form.id_profesional;
+
+  if (!open) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
-          <h2 className="font-medium text-base">{esEdicion ? "Reprogramar cita" : "Nueva cita"}</h2>
-          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]">✕</button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="bg-[var(--bg)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
+          <h2 className="font-semibold text-lg">
+            {esEdicion ? "Reprogramar cita" : "Nueva cita"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center text-2xl text-[var(--text-soft)] hover:bg-[var(--bg-soft)] rounded-full transition"
+          >
+            ✕
+          </button>
         </div>
-        <div className="p-5 flex flex-col gap-4">
+
+        {/* Contenido */}
+        <div className="p-6 flex flex-col gap-6 max-h-[75vh] overflow-y-auto">
+          {/* Cliente */}
           <div>
-            <label className="text-xs text-[var(--text-soft)] mb-1 block">Cliente *</label>
-            {esEdicion
-              ? <input className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm opacity-60" value={clientes.find((c: any) => c.cliente_id === form.id_cliente)?.nombre || ""} disabled />
-              : <ClienteBuscador clientes={clientes} value={form.id_cliente} onChange={(id) => set("id_cliente", id)} onCrearCliente={onCrearCliente} />}
+            <label className="text-xs text-[var(--text-soft)] mb-1.5 block">Cliente *</label>
+            {esEdicion ? (
+              <input
+                className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-2xl px-4 py-3 text-sm"
+                value={clientes.find((c: any) => c.cliente_id === form.id_cliente)?.nombre || ""}
+                disabled
+              />
+            ) : (
+              <ClienteBuscador
+                clientes={clientes}
+                value={form.id_cliente}
+                onChange={(id) => set("id_cliente", id)}
+                onCrearCliente={onCrearCliente}
+              />
+            )}
           </div>
+
+          {/* Servicio */}
           <div>
-            <label className="text-xs text-[var(--text-soft)] mb-1 block">Profesional *</label>
-            <select className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.id_profesional} onChange={(e) => set("id_profesional", e.target.value)}>
-              <option value="">Seleccionar profesional...</option>
-              {profesionales.map((p: any) => <option key={p.id_profesional} value={p.id_profesional}>{p.nombre}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-[var(--text-soft)] mb-1 block">Servicio *</label>
-            <select className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.id_servicio} onChange={(e) => set("id_servicio", e.target.value)}>
+            <label className="text-xs text-[var(--text-soft)] mb-1.5 block">Servicio *</label>
+            <select
+              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-2xl px-4 py-3 text-sm"
+              value={form.id_servicio}
+              onChange={(e) => set("id_servicio", e.target.value)}
+              disabled={!form.id_cliente}
+            >
               <option value="">Seleccionar servicio...</option>
-              {servicios.map((s: any) => <option key={s.id_servicio} value={s.id_servicio}>{s.nombre} — {s.duracion_min} min</option>)}
+              {servicios.map((s: Servicio) => (
+                <option key={s.id_servicio} value={s.id_servicio}>
+                  {s.nombre} — {s.duracion_min} min
+                </option>
+              ))}
             </select>
-            {servSel && <p className="text-xs text-[var(--text-soft)] mt-1">₡{Number(servSel.precio).toLocaleString("es-CR")} • {servSel.duracion_min} min</p>}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-[var(--text-soft)] mb-1 block">Fecha *</label>
-              <input type="date" className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.fecha} onChange={(e) => set("fecha", e.target.value)} />
-            </div>
-            <div>
-              <label className="text-xs text-[var(--text-soft)] mb-1 block">Hora *</label>
-              <input type="time" className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.hora} onChange={(e) => set("hora", e.target.value)} />
-            </div>
-          </div>
+
+          {/* Profesional */}
           <div>
-            <label className="text-xs text-[var(--text-soft)] mb-1 block">Notas (opcional)</label>
-            <textarea className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm resize-none" rows={3} value={form.notas ?? ""} onChange={(e) => set("notas", e.target.value)} />
+            <label className="text-xs text-[var(--text-soft)] mb-1.5 block">Profesional *</label>
+            <select
+              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-2xl px-4 py-3 text-sm"
+              value={form.id_profesional}
+              onChange={(e) => set("id_profesional", e.target.value)}
+              disabled={!form.id_servicio}
+            >
+              <option value="">Seleccionar profesional...</option>
+              {compatibleProfesionales.map((p: Profesional) => (
+                <option key={p.id_profesional} value={p.id_profesional}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* FECHA - Ahora con el DatePickerCustom mejorado */}
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1.5 block">Fecha *</label>
+            <DatePickerCustom
+              value={form.fecha}
+              onChange={(nuevaFecha: string) => set("fecha", nuevaFecha)}
+              disabled={isFechaDisabled}
+            />
+          </div>
+
+          {/* HORA - Ocupa todo el ancho */}
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1.5 block">Hora *</label>
+
+            {form.id_profesional && form.id_servicio && form.fecha ? (
+              availableSlots.length > 0 ? (
+                <div className="max-h-72 overflow-y-auto border border-[var(--border)] rounded-2xl p-3 bg-[var(--bg-soft)] grid grid-cols-3 gap-2.5">
+                  {availableSlots.map((slot) => (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => set("hora", slot)}
+                      className={`px-4 py-4 text-sm font-medium rounded-xl border transition-all active:scale-95 ${form.hora === slot
+                        ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm"
+                        : "border-[var(--border)] hover:border-[var(--accent)] hover:bg-white"
+                        }`}
+                    >
+                      {to12h(slot)}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="border border-amber-300 bg-amber-50/80 text-amber-700 rounded-2xl p-6 text-center text-sm leading-relaxed">
+                  No hay horarios disponibles para esta combinación.<br />
+                  Prueba con otra fecha o profesional.
+                </div>
+              )
+            ) : (
+              <div className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-2xl p-8 text-center text-[var(--text-soft)] text-sm">
+                Selecciona servicio, profesional y fecha para ver horarios disponibles
+              </div>
+            )}
+          </div>
+
+          {/* Notas */}
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1.5 block">Notas (opcional)</label>
+            <textarea
+              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-2xl px-4 py-3 text-sm resize-none"
+              rows={3}
+              value={form.notas ?? ""}
+              onChange={(e) => set("notas", e.target.value)}
+            />
           </div>
         </div>
-        <div className="flex gap-2 p-5 border-t border-[var(--border)]">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--bg-soft)]">Cancelar</button>
-          <button onClick={() => onSave(form, inicial?.id_cita)} disabled={loading || !camposCompletos} className="flex-1 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
+
+        {/* Footer */}
+        <div className="border-t border-[var(--border)] p-5 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3.5 text-sm font-medium border border-[var(--border)] rounded-2xl hover:bg-[var(--bg-soft)] transition"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onSave(form, inicial?.id_cita)}
+            disabled={loading || !camposCompletos}
+            className="flex-1 py-3.5 text-sm font-semibold text-white rounded-2xl transition disabled:opacity-50"
+            style={{ background: "var(--accent)" }}
+          >
             {loading ? "Guardando..." : esEdicion ? "Reprogramar cita" : "Crear cita"}
           </button>
         </div>
@@ -455,7 +793,6 @@ function CitaModal({ open, onClose, onSave, profesionales, servicios, clientes, 
     </div>
   );
 }
-
 // ─── ClienteModal ─────────────────────────────────────────────────────────────
 function ClienteModal({ open, onClose, onSave, loading }: {
   open: boolean; onClose: () => void; onSave: (form: ClienteForm) => void; loading: boolean;
@@ -740,7 +1077,15 @@ function VistaAgenda({
                       background: isOver ? "rgba(99,102,241,0.1)" : undefined,
                       cursor: isEmpty && !isDragging ? "pointer" : isDragging ? "grabbing" : "default",
                     }}
-                    onClick={() => { if (!isDragging && isEmpty) onCrear({ hora: slot, id_profesional: prof.id_profesional }); }}
+                    onClick={(e) => {
+                      e.stopPropagation();           // ← Evita que se propague y abra modal por error
+                      if (!isDragging && isEmpty) {
+                        onCrear({
+                          hora: slot,
+                          id_profesional: prof.id_profesional
+                        });
+                      }
+                    }}
                   >
                     {slotCitas.map((cita) => {
                       const isThisDragging = ghost?.cita.id_cita === cita.id_cita;
@@ -800,7 +1145,15 @@ function VistaAgenda({
                     data-slot-id={key}
                     className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-4 min-h-[72px] transition-colors"
                     style={{ background: isOver ? "rgba(99,102,241,0.08)" : undefined }}
-                    onClick={() => { if (!isDragging && isEmpty) onCrear({ hora: slot, id_profesional: prof.id_profesional }); }}
+                    onClick={(e) => {
+                      e.stopPropagation();   // ← Esto es clave
+                      if (!isDragging && isEmpty) {
+                        onCrear({
+                          hora: slot,
+                          id_profesional: prof.id_profesional
+                        });
+                      }
+                    }}
                   >
                     <div className="text-xs font-medium text-[var(--text-soft)] mb-2">{prof.nombre}</div>
                     <div className="flex flex-col gap-2">
@@ -843,7 +1196,7 @@ function CitasOperativasPage() {
 
   const [detailCita, setDetailCita] = useState<Cita | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-
+  const [profesionalServiciosMap, setProfesionalServiciosMap] = useState<Record<string, string[]>>({});
   const [clientes, setClientes] = useState<any[]>([]);
   const [citas, setCitas] = useState<Cita[]>([]);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
@@ -915,10 +1268,45 @@ function CitasOperativasPage() {
 
   useEffect(() => {
     if (!negocio?.id) return;
+
     loadCitas();
-    supabase.from("profesionales").select("*, especialidad:especialidades(nombre, sector)").eq("negocio_id", negocio.id).eq("activo", true).then(({ data }) => setProfesionales(data || []));
-    supabase.from("servicios").select("*").eq("negocio_id", negocio.id).eq("activo", true).then(({ data }) => setServicios(data || []));
-    supabase.from("clientes_negocio").select("cliente_id, nombre, id_whatsapp").eq("negocio_id", negocio.id).then(({ data }) => setClientes(data || []));
+
+    // Cargar profesionales
+    supabase
+      .from("profesionales")
+      .select("*, especialidad:especialidades(nombre, sector)")
+      .eq("negocio_id", negocio.id)
+      .eq("activo", true)
+      .then(({ data }) => setProfesionales(data || []));
+
+    // Cargar servicios
+    supabase
+      .from("servicios")
+      .select("*")
+      .eq("negocio_id", negocio.id)
+      .eq("activo", true)
+      .then(({ data }) => setServicios(data || []));
+
+    // Cargar clientes
+    supabase
+      .from("clientes_negocio")
+      .select("cliente_id, nombre, id_whatsapp")
+      .eq("negocio_id", negocio.id)
+      .then(({ data }) => setClientes(data || []));
+
+    // ←←← NUEVO: Cargar el mapa de profesional ↔ servicios
+    supabase
+      .from("profesional_servicios")
+      .select("servicio_id, profesional_id")
+      .then(({ data }) => {
+        const map: Record<string, string[]> = {};
+        (data || []).forEach((row: any) => {
+          if (!map[row.servicio_id]) map[row.servicio_id] = [];
+          map[row.servicio_id].push(row.profesional_id);
+        });
+        setProfesionalServiciosMap(map);
+      });
+
   }, [negocio?.id, loadCitas]);
 
   const handleSave = async (form: CitaForm, id?: string) => {
@@ -1089,14 +1477,45 @@ function CitasOperativasPage() {
           negocioId={negocio?.id ?? ""}
           onReload={loadCitas}
           onCrear={({ hora, id_profesional }) => {
-            setEditando({ id_cita: "", id_cliente: "", id_profesional, id_servicio: "", fecha: agendaFecha, hora, nombre_profesional: "", nombre_servicio: "", color_hex: "", precio: 0, estado: "Agendada", duracion_min: 0 } as Cita);
+            // Evitamos abrir si ya está abierto o si no hay datos válidos
+            if (modalOpen) return;
+
+            setEditando({
+              id_cita: "",
+              id_cliente: "",
+              id_profesional,
+              id_servicio: "",
+              fecha: agendaFecha,           // usamos siempre la fecha actual de la agenda
+              hora,
+              nombre_profesional: "",
+              nombre_servicio: "",
+              color_hex: "",
+              precio: 0,
+              estado: "Agendada",
+              duracion_min: 0
+            } as Cita);
+
             setModalOpen(true);
           }}
           onEditar={(cita) => { setDetailCita(cita); setDetailOpen(true); }}
         />
       )}
 
-      <CitaModal open={modalOpen} onClose={() => { setModalOpen(false); setEditando(null); }} onSave={handleSave} profesionales={profesionales} servicios={servicios} clientes={clientes} onCrearCliente={() => setClienteModalOpen(true)} inicial={editando ? { ...editando, hora: editando.hora?.slice(0, 5) } : undefined} loading={saving} />
+      <CitaModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setEditando(null); }}
+        onSave={handleSave}
+        profesionales={profesionales}
+        servicios={servicios}
+        clientes={clientes}
+        onCrearCliente={() => setClienteModalOpen(true)}
+        inicial={editando ? { ...editando, hora: editando.hora?.slice(0, 5) } : undefined}
+        loading={saving}
+        horarioSemanal={horarioSemanal}
+        excepciones={excepciones}
+        citas={citas}
+        profesionalServiciosMap={profesionalServiciosMap}
+      />
 
       <ClienteModal open={clienteModalOpen} onClose={() => setClienteModalOpen(false)} onSave={handleGuardarCliente} loading={saving} />
 
