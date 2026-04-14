@@ -117,9 +117,11 @@ function DatePickerCustom({
   // Formato EXACTO que querías: "jueves 16 de abril, 2026"
   const formatFechaLegible = (fecha: string): string => {
     if (!fecha) return "Seleccionar fecha";
-    // Parsear manualmente para evitar conversión UTC → local
-    const [year, month, day] = fecha.split("-").map(Number);
-    const date = new Date(year, month - 1, day); // mes es 0-indexado
+    const parts = fecha.split("-");
+    const year = Number(parts[0] ?? "0");
+    const month = Number(parts[1] ?? "1");
+    const day = Number(parts[2] ?? "1");
+    const date = new Date(year, month - 1, day);
     let formatted = new Intl.DateTimeFormat("es-ES", {
       weekday: "long",
       day: "numeric",
