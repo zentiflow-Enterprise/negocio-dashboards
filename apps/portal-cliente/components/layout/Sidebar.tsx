@@ -133,7 +133,7 @@ export function Sidebar({ negocio, mobile = false }: { negocio: any, mobile?: bo
 
     const userName = usuario?.nombre?.split(" ")[0] || "Usuario";
     const userRole = usuario?.rol === "admin" || usuario?.rol === "Administrador" ? "Administrador" : "Barbero";
-
+    const [openProfile, setOpenProfile] = useState(false);
     return (
         <aside className={`${mobile ? "flex" : "hidden md:flex"} w-64 border-r border-[var(--border)] bg-[var(--bg-soft)] p-5 flex-col min-h-screen`}>
 
@@ -186,18 +186,23 @@ export function Sidebar({ negocio, mobile = false }: { negocio: any, mobile?: bo
 
             {/* Perfil de Usuario */}
             <div className="border-t border-[var(--border)] pt-6 mt-auto">
-                <div className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--bg)]">
+
+                <button
+                    onClick={() => setOpenProfile(true)}
+                    className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--bg)] hover:bg-[var(--bg-soft)] transition-all w-full text-left"
+                >
                     <div
                         className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-lg flex-shrink-0"
                         style={{ background: "var(--accent)" }}
                     >
                         {userName.charAt(0).toUpperCase()}
                     </div>
+
                     <div className="flex flex-col min-w-0">
                         <span className="font-medium text-sm truncate">{userName}</span>
                         <span className="text-xs text-[var(--text-soft)] capitalize">{userRole}</span>
                     </div>
-                </div>
+                </button>
 
                 <button
                     onClick={logout}
@@ -205,6 +210,7 @@ export function Sidebar({ negocio, mobile = false }: { negocio: any, mobile?: bo
                 >
                     Cerrar sesión
                 </button>
+
             </div>
         </aside>
     );

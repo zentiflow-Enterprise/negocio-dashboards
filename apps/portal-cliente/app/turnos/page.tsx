@@ -14,7 +14,6 @@ interface Turno {
   hora_entrada: string;
   hora_salida: string;
   dias_trabajo: string[];
-  dia_libre: string;
   activo: boolean;
   creado_en: string;
 }
@@ -24,7 +23,6 @@ interface TurnoForm {
   hora_entrada: string;
   hora_salida: string;
   dias_trabajo: string[];
-  dia_libre: string;
   activo: boolean;
 }
 
@@ -43,7 +41,6 @@ const FORM_EMPTY: TurnoForm = {
   hora_entrada: "08:00",
   hora_salida: "17:00",
   dias_trabajo: ["lunes", "martes", "miercoles", "jueves", "viernes"],
-  dia_libre: "",
   activo: true,
 };
 
@@ -88,8 +85,8 @@ function DiaChips({
   const toggleDia = (key: string) => {
     if (!onChange) return;
     const nuevosDias = dias.includes(key)
-      ? dias.filter((d) => d !== key)           // quita el día
-      : [...dias, key];                         // agrega el día
+      ? dias.filter((d) => d !== key)
+      : [...dias, key];
     onChange(nuevosDias);
   };
 
@@ -97,7 +94,6 @@ function DiaChips({
     <div className="flex gap-1 flex-wrap">
       {DIAS_SEMANA.map(({ key, label }) => {
         const activo = dias.includes(key);
-
         return interactive ? (
           <button
             key={key}
@@ -126,7 +122,7 @@ function DiaChips({
   );
 }
 
-// ─── Tarjeta de Turno (compacta) ──────────────────────────────────────────────
+// ─── Tarjeta de Turno ─────────────────────────────────────────────────────────
 function TurnoCard({
   turno,
   onEdit,
@@ -134,7 +130,6 @@ function TurnoCard({
   turno: Turno;
   onEdit: (t: Turno) => void;
 }) {
-  // Calcular jornada
   let jornada = "—";
   try {
     const [hE = 0, mE = 0] = turno.hora_entrada.split(":").map(Number);
@@ -147,11 +142,9 @@ function TurnoCard({
     }
   } catch { }
 
-  const diaLibreLabel = DIAS_SEMANA.find((d) => d.key === turno.dia_libre)?.label;
-
   return (
     <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl flex flex-col gap-3 p-4 hover:border-[var(--accent)]/40 transition-all duration-150 h-full">
-      {/* Header: Nombre + Estado + Editar */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="font-medium text-base leading-tight truncate">{turno.nombre_turno}</p>
@@ -181,19 +174,11 @@ function TurnoCard({
         <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-1">Días de trabajo</p>
         <DiaChips dias={turno.dias_trabajo || []} />
       </div>
-
-      {/* Día libre */}
-      {turno.dia_libre && (
-        <div>
-          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">Día libre</p>
-          <p className="text-sm">{diaLibreLabel}</p>
-        </div>
-      )}
     </div>
   );
 }
 
-// ─── Modal (se mantiene igual) ────────────────────────────────────────────────
+// ─── Modal ────────────────────────────────────────────────────────────────────
 function TurnoModal({
   open,
   onClose,
@@ -302,22 +287,6 @@ function TurnoModal({
             <p className="text-xs text-[var(--text-soft)] mt-1">
               {form.dias_trabajo.length} día{form.dias_trabajo.length !== 1 ? "s" : ""} seleccionado{form.dias_trabajo.length !== 1 ? "s" : ""}
             </p>
-          </div>
-
-          <div>
-            <label className="text-xs text-[var(--text-soft)] mb-1 block">Día libre (opcional)</label>
-            <select
-              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
-              value={form.dia_libre}
-              onChange={(e) => set("dia_libre", e.target.value)}
-            >
-              <option value="">Sin día libre definido</option>
-              {DIAS_SEMANA.map(({ key, label }) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
           </div>
 
           <div className="flex items-center justify-between bg-[var(--bg-soft)] rounded-lg px-3 py-2">
@@ -470,7 +439,6 @@ function TurnosPage() {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
-
         <select
           className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
           value={filtroActivo}
@@ -480,7 +448,6 @@ function TurnosPage() {
           <option value="activo">Activos</option>
           <option value="inactivo">Inactivos</option>
         </select>
-
         <span className="text-xs text-[var(--text-soft)] ml-auto whitespace-nowrap">
           {filtrados.length} resultado{filtrados.length !== 1 ? "s" : ""}
         </span>
