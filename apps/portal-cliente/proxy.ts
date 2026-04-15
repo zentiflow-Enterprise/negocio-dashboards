@@ -20,16 +20,16 @@ export async function proxy(req: NextRequest) {
         }
     );
 
+    await supabase.auth.getUser();
+
     const {
         data: { user },
     } = await supabase.auth.getUser();
 
-    // 🔐 proteger rutas
     if (!user && req.nextUrl.pathname.startsWith("/dashboard")) {
         return NextResponse.redirect(new URL("/", req.url));
     }
 
-    // 🔁 evitar volver al login si ya está logueado
     if (user && req.nextUrl.pathname === "/") {
         return NextResponse.redirect(new URL("/dashboard", req.url));
     }
@@ -38,5 +38,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-    matcher: ["/", "/dashboard/:path*"],
+    matcher: ["/", "/dashboard/:path*", "/reset-password"],
 };
