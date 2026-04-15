@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/lib/client";
@@ -7,7 +8,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
     const supabase = createClient();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -235,5 +236,12 @@ export default function ResetPasswordPage() {
                 </div>
             </div>
         </>
+    );
+}
+export default function ResetPasswordPage() {
+    return (
+        <Suspense fallback={null}>
+            <ResetPasswordContent />
+        </Suspense>
     );
 }
