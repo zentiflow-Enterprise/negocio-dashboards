@@ -13,7 +13,6 @@ export default function SignUpPage() {
 
     const [form, setForm] = useState({
         nombre: "",
-        nombre_negocio: "",
         email: "",
         password: "",
     });
@@ -37,7 +36,6 @@ export default function SignUpPage() {
             // Limpiar todo
             setForm({
                 nombre: "",
-                nombre_negocio: "",
                 email: "",
                 password: "",
             });
@@ -238,7 +236,10 @@ export default function SignUpPage() {
             });
 
             if (authError) {
-                if (authError.message.toLowerCase().includes("already") || authError.message.toLowerCase().includes("exists")) {
+                if (
+                    authError.message.toLowerCase().includes("already") ||
+                    authError.message.toLowerCase().includes("exists")
+                ) {
                     setErrorMsg("Este correo electrónico ya está registrado.");
                 } else {
                     setErrorMsg(authError.message);
@@ -247,16 +248,7 @@ export default function SignUpPage() {
                 return;
             }
 
-            const { error: dbError } = await supabase
-                .from("usuarios_dashboard")
-                .insert({
-                    auth_user_id: authData.user?.id,
-                    email: form.email,
-                    nombre: form.nombre,
-                    rol: "admin",
-                });
-
-            if (dbError) throw dbError;
+            // 🚀 NADA MÁS AQUÍ
 
             toast.success("¡Cuenta creada exitosamente! Revisa tu correo para confirmar.");
             router.push("/login");
@@ -267,7 +259,6 @@ export default function SignUpPage() {
             setLoading(false);
         }
     };
-
     return (
         <>
             <style>{`
@@ -645,17 +636,7 @@ export default function SignUpPage() {
                             />
                         </div>
 
-                        <div className="zf-field">
-                            <div className="zf-label"><span>Nombre de tu negocio</span><div className="zf-label-line" /></div>
-                            <input
-                                type="text"
-                                className="zf-input"
-                                placeholder="Nombre de tu negocio"
-                                value={form.nombre_negocio}
-                                onChange={(e) => setForm({ ...form, nombre_negocio: e.target.value })}
-                                required
-                            />
-                        </div>
+
 
                         <div className="zf-field">
                             <div className="zf-label"><span>Correo electrónico</span><div className="zf-label-line" /></div>
