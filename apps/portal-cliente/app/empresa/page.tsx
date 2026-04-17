@@ -40,12 +40,14 @@ function EmpresaPage() {
     const [form, setForm] = useState<any>({});
     const [saving, setSaving] = useState(false);
     const [activeDays, setActiveDays] = useState<string[]>(["lunes", "martes", "miercoles", "jueves", "viernes"]); // días activos por defecto
-
+    const [loadingData, setLoadingData] = useState(true);
     // Cargar datos completos
     useEffect(() => {
         if (!negocio?.id) return;
 
         const loadFullData = async () => {
+            setLoadingData(true);
+
             const { data } = await supabase
                 .from("config_negocio")
                 .select("*")
@@ -53,6 +55,8 @@ function EmpresaPage() {
                 .single();
 
             if (data) setForm(data);
+
+            setLoadingData(false);
         };
 
         loadFullData();
@@ -101,7 +105,7 @@ function EmpresaPage() {
 
     const handleDiscard = () => window.location.reload();
 
-    if (negocioLoading || !form.neg_nombre) {
+    if (negocioLoading || loadingData) {
         return (
             <div className="flex min-h-[60vh] items-center justify-center">
                 <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />

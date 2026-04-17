@@ -12,6 +12,7 @@ export function useNegocio() {
     useEffect(() => {
         const load = async () => {
             try {
+                // 1. usuario auth
                 const { data: userData } = await supabase.auth.getUser();
 
                 if (!userData?.user) {
@@ -19,9 +20,10 @@ export function useNegocio() {
                     return;
                 }
 
+                // 2. usuario_dashboard
                 const { data: usuario } = await supabase
                     .from("usuarios_dashboard")
-                    .select("negocio_id")
+                    .select("usuario_id")
                     .eq("auth_user_id", userData.user.id)
                     .single();
 
@@ -30,17 +32,37 @@ export function useNegocio() {
                     return;
                 }
 
-                const { data: negocioData } = await supabase
-                    .from("config_negocio")
-                    .select("*")
-                    .eq("negocio_id", usuario.negocio_id)
+                // 3. relación usuario_negocio
+                const { data: rel } = await supabase
+                    .from("usuarios_negocios")
+                    .select("negocio_id")
+                    .eq("usuario_id", usuario.usuario_id)
                     .single();
 
-                if (!negocioData) {
+                if (!rel) {
                     setLoading(false);
                     return;
                 }
 
+                // 4. config del negocio
+                const { data: negocioData } = await supabase
+                    .from("config_negocio")
+                    .select("*")
+                    .eq("negocio_id", rel.negocio_id)
+                    .maybeSingle(); // 🔥 importante
+
+                if (!negocioData) {
+                    // fallback mínimo
+                    setNegocio({
+                        id: rel.negocio_id,
+                        nombre: "Mi negocio",
+                        color: "#c9a96e",
+                    });
+                    setLoading(false);
+                    return;
+                }
+
+                // 5. UI
                 const negocioUI = {
                     id: negocioData.negocio_id,
                     nombre: negocioData.neg_nombre || "Mi negocio",
@@ -50,6 +72,7 @@ export function useNegocio() {
                 };
 
                 setNegocio(negocioUI);
+
             } catch (err) {
                 console.error("Error cargando negocio:", err);
             } finally {
