@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Sidebar } from "./Sidebar";
+import { useUsuario } from "@/lib/hooks/useUsuario";
 
 export function MobileMenu({ negocio }: { negocio: any }) {
     const [isOpen, setIsOpen] = useState(false);
-
+    const { usuario } = useUsuario();
     return (
         <>
             {/* Botón Hamburguesa - Solo visible en móvil */}
@@ -27,7 +28,8 @@ export function MobileMenu({ negocio }: { negocio: any }) {
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Reutilizamos exactamente el mismo Sidebar */}
-                        <Sidebar negocio={negocio} mobile={true} />
+
+                        <Sidebar negocio={negocio} usuario={usuario || {}} mobile={true} />
                     </div>
                 </div>
             )}
