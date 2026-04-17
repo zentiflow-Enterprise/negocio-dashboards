@@ -111,27 +111,11 @@ const NAV_ITEMS = [
     },
 ];
 
-export function Sidebar({ negocio, mobile = false }: { negocio: any; mobile?: boolean }) {
+export function Sidebar({ negocio, usuario, mobile = false }: { negocio: any; usuario: any; mobile?: boolean }) {
     const supabase = createClient();
     const pathname = usePathname();
 
-    const [usuario, setUsuario] = useState<any>(null);
 
-    useEffect(() => {
-        const loadUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data } = await supabase
-                .from("usuarios_dashboard")
-                .select("*")
-                .eq("auth_user_id", user.id)
-                .single();
-
-            setUsuario(data);
-        };
-        loadUser();
-    }, []);
 
     const nombreNegocio = negocio?.neg_nombre || negocio?.nombre || "Mi Negocio";
     const logo = negocio?.neg_logo_url || negocio?.logo;
@@ -143,9 +127,12 @@ export function Sidebar({ negocio, mobile = false }: { negocio: any; mobile?: bo
 
     const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
-    const userName = usuario?.nombre?.split(" ")[0] || "Usuario";
-    const userRole = usuario?.rol === "admin" || usuario?.rol === "Administrador" ? "Administrador" : "Barbero";
+    const userName = usuario?.nombre?.split(" ")[0] || "";
 
+    const userRole =
+        usuario?.rol === "admin" || usuario?.rol === "Administrador"
+            ? "Administrador"
+            : "";
     return (
         <aside className={`${mobile ? "flex" : "hidden md:flex"} w-64 border-r border-[var(--border)] bg-[var(--bg-soft)] p-5 flex-col min-h-screen`}>
 

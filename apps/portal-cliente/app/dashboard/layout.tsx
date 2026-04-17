@@ -7,6 +7,7 @@ import { MobileNav } from "@/components/layout/MobileNav";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 import { useEffect, useState } from "react";
 import { Toaster } from "react-hot-toast";
+import { useUsuario } from "@/lib/hooks/useUsuario";
 
 export default function DashboardLayout({
     children,
@@ -14,6 +15,7 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const { negocio } = useNegocio();
+    const { usuario, loading: usuarioLoading } = useUsuario();
 
     const [theme, setTheme] = useState<"dark" | "light">("dark");
 
@@ -34,6 +36,8 @@ export default function DashboardLayout({
         }
     }, []);
 
+
+
     const toggleTheme = () => {
         const html = document.documentElement;
         if (html.classList.contains("dark")) {
@@ -51,7 +55,7 @@ export default function DashboardLayout({
         <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
 
             {/* SIDEBAR - Solo visible en desktop */}
-            <Sidebar negocio={negocio} />
+            <Sidebar negocio={negocio} usuario={usuario || {}} />
 
             {/* Área de Contenido */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
