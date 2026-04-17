@@ -21,7 +21,7 @@ export default function DashboardLayout({
 
     useEffect(() => {
         if (!negocio) return;
-        document.documentElement.style.setProperty("--accent", negocio.neg_color_acento || "#c9a96e");
+        document.documentElement.style.setProperty("--accent", negocio.color || "#c9a96e");
         document.title = `Portal · ${negocio.neg_nombre || "Cliente"}`;
     }, [negocio]);
 
