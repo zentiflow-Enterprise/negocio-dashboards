@@ -21,8 +21,21 @@ export default function DashboardLayout({
 
     useEffect(() => {
         if (!negocio) return;
-        document.documentElement.style.setProperty("--accent", negocio.color || "#c9a96e");
-        document.title = `Portal · ${negocio.neg_nombre || "Cliente"}`;
+
+        const color = negocio.color || "#c9a96e";
+
+        // 🎨 1. CSS dinámico (tu branding)
+        document.documentElement.style.setProperty("--accent", color);
+
+        // 🌐 2. Título dinámico
+        document.title = `Portal · ${negocio.nombre || "Cliente"}`;
+
+        // 📱 3. PWA / navegador (MUY IMPORTANTE)
+        const metaTheme = document.querySelector("meta[name='theme-color']");
+        if (metaTheme) {
+            metaTheme.setAttribute("content", color);
+        }
+
     }, [negocio]);
 
     useEffect(() => {
