@@ -65,7 +65,7 @@ export function Topbar({
                 {/* 🔐 LOGOUT */}
                 <button
                     onClick={logout}
-                    className="px-4 py-2 rounded-xl bg-[var(--bg-soft)] border border-[var(--border)] hover:bg-red-500 hover:text-white transition text-sm"
+                    className="hidden md:block px-4 py-2 rounded-xl bg-[var(--bg-soft)] border border-[var(--border)] hover:bg-red-500 hover:text-white transition text-sm"
                 >
                     Cerrar sesión
                 </button>
