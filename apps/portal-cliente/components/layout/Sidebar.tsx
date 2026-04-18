@@ -117,7 +117,7 @@ export function Sidebar({ negocio, usuario, mobile = false }: { negocio: any; us
 
 
 
-    const nombreNegocio = negocio?.neg_nombre || negocio?.nombre || "Mi Negocio";
+    const nombreNegocio = negocio?.nombre || "Mi Negocio";
     const logo = negocio?.neg_logo_url || negocio?.logo;
 
     const logout = async () => {

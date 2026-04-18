@@ -5,6 +5,7 @@ import { createClient } from "@supabase/lib/client";
 import { useNegocio } from "@/lib/hooks/useNegocio";
 import toast from "react-hot-toast";
 import DashboardLayout from "../dashboard/layout";
+import { setNegocioGlobal } from "@/lib/hooks/useNegocio";
 
 const MONEDAS = [
     { value: "₡", label: "₡ Colón (CRC)" },
@@ -85,24 +86,61 @@ function EmpresaPage() {
         if (!negocio?.id) return toast.error("No se encontró el negocio");
 
         setSaving(true);
+
         try {
+            const payload = {
+                ...form,
+                actualizado_en: new Date().toISOString(),
+            };
+
             const { error } = await supabase
                 .from("config_negocio")
-                .update({
-                    ...form,
-                    actualizado_en: new Date().toISOString(),
-                })
+                .update(payload)
                 .eq("negocio_id", negocio.id);
 
             if (error) throw error;
+
+            // 🔥 NORMALIZAR (evita undefined)
+            const updatedNegocio = {
+                ...negocio,
+
+                // UI (lo que realmente usas en toda la app)
+                nombre: payload.neg_nombre || negocio.nombre || "Mi negocio",
+                color: payload.neg_color_acento || negocio.color || "#c9a96e",
+                logo: payload.neg_logo_url || negocio.logo || null,
+                ciudad: payload.neg_ciudad || negocio.ciudad || "",
+
+                // Compatibilidad (por si algún componente usa nombres BD)
+                neg_nombre: payload.neg_nombre,
+                neg_color_acento: payload.neg_color_acento,
+                neg_logo_url: payload.neg_logo_url,
+                neg_ciudad: payload.neg_ciudad,
+            };
+
+            // 🔥 1. ACTUALIZAR CACHE GLOBAL (CLAVE)
+            setNegocioGlobal(updatedNegocio);
+
+            // 🔥 2. APLICAR BRANDING INMEDIATO
+            document.documentElement.style.setProperty(
+                "--accent",
+                updatedNegocio.color
+            );
+
+            // 🔥 3. ACTUALIZAR FORM LOCAL
+            setForm((prev: any) => ({
+                ...prev,
+                ...payload,
+            }));
+
             toast.success("✅ Guardado correctamente");
+
         } catch (err) {
+            console.error(err);
             toast.error("❌ Error al guardar");
         } finally {
             setSaving(false);
         }
     };
-
     const handleDiscard = () => window.location.reload();
 
     if (negocioLoading || loadingData) {
