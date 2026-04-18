@@ -39,27 +39,33 @@ function PerfilPage() {
     };
 
     const handleSave = async () => {
-        if (!usuario?.id) {
+        if (!usuario?.usuario_id) {
             toast.error("No se encontró el usuario");
             return;
         }
 
         setSaving(true);
+
         try {
             const { error } = await supabase
                 .from("usuarios_dashboard")
                 .update({
                     nombre: form.nombre,
                     telefono: form.telefono,
-                    actualizado_en: new Date().toISOString(),
                 })
-                .eq("id", usuario.id);
+                .eq("usuario_id", usuario.usuario_id); // 🔥 clave correcta
 
-            if (error) throw error;
+            if (error) {
+                console.error(error);
+                throw error;
+            }
 
             setUsuario({ ...usuario, ...form });
+
             toast.success("✅ Perfil actualizado correctamente");
+
         } catch (err) {
+            console.error("Error update:", err);
             toast.error("❌ Error al actualizar el perfil");
         } finally {
             setSaving(false);
