@@ -32,9 +32,8 @@
 }
 
 /* ═══════════════════════════════════════
-   ACCENT UTILITIES (branding dinámico)
+   ACCENT UTILITIES
 ═══════════════════════════════════════ */
-
 .bg-accent {
   background-color: var(--accent);
 }
@@ -56,7 +55,6 @@
   background-color: var(--accent);
   color: #000;
 }
-
 
 /* ═══════════════════════════════════════
    BASE
@@ -144,4 +142,206 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ═══════════════════════════════════════
+   PHONE INPUT — WRAPPER COMPLETO
+═══════════════════════════════════════ */
+
+/* Contenedor principal */
+.custom-phone-input {
+  display: flex;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background-color: var(--bg);
+  transition: border-color 0.2s;
+}
+
+.custom-phone-input:focus-within {
+  border-color: var(--accent);
+}
+
+/* Sección del selector de país */
+.custom-phone-input .PhoneInputCountry {
+  display: flex;
+  align-items: center;
+  padding: 0 10px 0 14px;
+  background-color: var(--bg-soft) !important;
+  border-right: 1px solid var(--border) !important;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* La bandera */
+.custom-phone-input .PhoneInputCountryIcon {
+  width: 22px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* El <select> nativo oculto que controla el país */
+/* CRÍTICO: forzar colores para evitar texto blanco-sobre-blanco */
+.custom-phone-input .PhoneInputCountrySelect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* La flecha del selector de país */
+.custom-phone-input .PhoneInputCountrySelectArrow {
+  color: var(--text-soft) !important;
+  opacity: 1 !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-color: var(--text-soft) !important;
+}
+
+/* Input del número */
+.custom-phone-input .PhoneInputInput {
+  flex: 1;
+  height: 100%;
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+  border: none !important;
+  outline: none !important;
+  padding: 0 14px;
+  font-size: 0.875rem;
+  min-width: 0;
+}
+
+.custom-phone-input .PhoneInputInput::placeholder {
+  color: var(--text-soft) !important;
+}
+
+/* ─── DROPDOWN DE PAÍS (el listado que aparece al hacer click) ─── */
+/* react-phone-number-input renderiza un <select> nativo del OS,
+   no un dropdown custom, por lo que los estilos del dropdown
+   los controla el sistema operativo. Para tener control total
+   usamos el select visible en su lugar. */
+
+/* Forzar colores en el select nativo cuando está abierto
+   (funciona en Firefox; Chrome/Safari usan UI nativa del OS) */
+.custom-phone-input .PhoneInputCountrySelect option {
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+/* ─── Modo oscuro explícito para el dropdown nativo ─── */
+.dark .custom-phone-input .PhoneInputCountrySelect option {
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+}
+
+.dark .custom-phone-input .PhoneInputCountry {
+  background-color: #121212 !important;
+  border-right-color: #1f1f1f !important;
+}
+
+.dark .custom-phone-input .PhoneInputInput {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+}
+
+/* ─── Modo claro explícito ─── */
+:root .custom-phone-input .PhoneInputCountrySelect option {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+}
+
+/* ═══════════════════════════════════════
+   COUNTRY SELECTOR - DARK MODE (VERSIÓN CORREGIDA)
+═══════════════════════════════════════ */
+.country-selector-custom .flag-select__button {
+  background-color: var(--bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.75rem !important;
+  color: var(--text) !important;
+  height: 44px !important;
+  padding: 0 16px !important;
+}
+
+.country-selector-custom .flag-select__button:hover {
+  background-color: var(--bg-soft) !important;
+}
+
+/* Dropdown abierto */
+.flag-select__options,
+.flag-select__dropdown,
+.flag-select__menu,
+.flag-select__list {
+  background-color: var(--bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3) !important;
+  color: var(--text) !important;
+  z-index: 9999 !important;
+}
+
+/* Opciones */
+.flag-select__option {
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+  padding: 10px 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  min-height: 40px !important;
+}
+
+.flag-select__option:hover,
+.flag-select__option--is-focused {
+  background-color: var(--bg-soft) !important;
+}
+
+/* Banderas */
+.flag-select__option img,
+.flag-select__option .flag {
+  margin-right: 12px !important;
+  display: inline-block !important;
+}
+
+/* Buscador */
+.flag-select__search-input {
+  background-color: var(--bg) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  margin: 8px !important;
+  border-radius: 6px !important;
+}
+
+.flag-select__search-input::placeholder {
+  color: var(--text-soft) !important;
+}
+
+/* ═══════════════════════════════════════
+   SELECTS NATIVOS (país + otros)
+═══════════════════════════════════════ */
+select {
+  background-color: var(--bg);
+  color: var(--text);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23666666' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+}
+
+select option {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+.dark select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23aaaaaa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+.dark select option {
+  background-color: #1a1a1a;
+  color: #ffffff;
 }
