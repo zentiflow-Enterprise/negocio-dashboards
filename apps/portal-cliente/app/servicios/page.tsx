@@ -17,6 +17,14 @@ interface Servicio {
   color_hex: string;
   activo: boolean;
   creado_en: string;
+  id_especialidad?: string;
+}
+
+interface Especialidad {
+  id_especialidad: string;
+  nombre: string;
+  negocio_id: string;
+  activo: boolean;
 }
 
 interface ServicioForm {
@@ -26,6 +34,7 @@ interface ServicioForm {
   descripcion: string;
   color_hex: string;
   activo: boolean;
+  id_especialidad?: string;
 }
 
 const FORM_EMPTY: ServicioForm = {
@@ -36,6 +45,7 @@ const FORM_EMPTY: ServicioForm = {
   color_hex: "#c9a96e",
   activo: true,
 };
+
 
 const COLORES_PRESET = [
   "#c9a96e", "#10b981", "#3b82f6", "#8b5cf6",
@@ -125,6 +135,7 @@ function ServicioCard({
 
 // ─── Modal ──────────────────────────────────────────
 function ServicioModal({
+  especialidades,
   open,
   onClose,
   onSave,
@@ -132,6 +143,7 @@ function ServicioModal({
   inicial,
   loading,
 }: {
+  especialidades: any[];
   open: boolean;
   onClose: () => void;
   onSave: (form: ServicioForm, id?: string) => void;
@@ -173,6 +185,23 @@ function ServicioModal({
 
         <div className="p-5 flex flex-col gap-4">
           <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">
+              Especialidad *
+            </label>
+            <select
+              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
+              value={form.id_especialidad || ""}
+              onChange={(e) => set("id_especialidad", e.target.value)}
+            >
+              <option value="">Seleccionar...</option>
+              {especialidades.map((e) => (
+                <option key={e.id_especialidad} value={e.id_especialidad}>
+                  {e.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="text-xs text-[var(--text-soft)] mb-1 block">Nombre *</label>
             <input
               className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
@@ -188,7 +217,7 @@ function ServicioModal({
               className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] resize-none"
               rows={3}
               placeholder="Descripción breve del servicio..."
-              value={form.descripcion}
+              value={form.descripcion ?? ""}
               onChange={(e) => set("descripcion", e.target.value)}
             />
           </div>
@@ -294,33 +323,62 @@ function ServicioModal({
 function ServiciosPage() {
   const supabase = createClient();
   const { negocio } = useNegocio();
-
+  const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
   const [servicios, setServicios] = useState<Servicio[]>([]);
+
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [busqueda, setBusqueda] = useState("");
   const [filtroActivo, setFiltroActivo] = useState<"todos" | "activo" | "inactivo">("todos");
+  const [filtroEspecialidad, setFiltroEspecialidad] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState<Servicio | null>(null);
 
+
+
   const loadServicios = useCallback(async () => {
     if (!negocio?.id) return;
+
     setLoading(true);
-    const { data } = await supabase
+
+    let query = supabase
       .from("servicios")
       .select("*")
-      .eq("negocio_id", negocio.id)
-      .order("nombre", { ascending: true });
+      .eq("negocio_id", negocio.id);
+
+    // 🔥 NUEVO: filtro por especialidad
+    if (filtroEspecialidad) {
+      query = query.eq("id_especialidad", filtroEspecialidad);
+    }
+
+    const { data } = await query.order("nombre", { ascending: true });
+
     setServicios((data as Servicio[]) || []);
     setLoading(false);
+
+  }, [negocio?.id, filtroEspecialidad]);
+
+  const loadEspecialidades = useCallback(async () => {
+    if (!negocio?.id) return;
+
+    const { data } = await supabase
+      .from("especialidades")
+      .select("*")
+      .eq("negocio_id", negocio.id)
+      .eq("activo", true)
+      .order("nombre");
+
+    setEspecialidades(data || []);
   }, [negocio?.id]);
 
   useEffect(() => {
     if (!negocio?.id) return;
     loadServicios();
-  }, [negocio?.id, loadServicios]);
+    loadEspecialidades();
+  }, [negocio?.id, loadServicios, loadEspecialidades]);
 
   const handleSave = async (form: ServicioForm, id?: string) => {
     if (!negocio?.id) return;
@@ -413,6 +471,19 @@ function ServiciosPage() {
           <option value="inactivo">Inactivos</option>
         </select>
 
+        <select
+          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm"
+          value={filtroEspecialidad}
+          onChange={(e) => setFiltroEspecialidad(e.target.value)}
+        >
+          <option value="">Todas las especialidades</option>
+          {especialidades.map((e) => (
+            <option key={e.id_especialidad} value={e.id_especialidad}>
+              {e.nombre}
+            </option>
+          ))}
+        </select>
+
         <span className="text-xs text-[var(--text-soft)] ml-auto whitespace-nowrap">
           {filtrados.length} resultado{filtrados.length !== 1 ? "s" : ""}
         </span>
@@ -456,6 +527,7 @@ function ServiciosPage() {
         onDelete={handleDelete}
         inicial={editando || undefined}
         loading={saving}
+        especialidades={especialidades}
       />
     </div>
   );

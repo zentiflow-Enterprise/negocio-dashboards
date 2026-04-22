@@ -14,6 +14,15 @@ interface Profesional {
   email: string | null;
   telefono: string | null;
   id_turno: string | null;
+  id_especialidad: string | null;
+  activo: boolean;
+  creado_en: string;
+}
+
+interface Especialidad {
+  id_especialidad: string;
+  nombre: string;
+  sector: string;
   activo: boolean;
   creado_en: string;
 }
@@ -27,17 +36,31 @@ interface Turno {
   activo: boolean;
 }
 
+interface Servicio {
+  id_servicio: string;
+  negocio_id: string;
+  nombre: string;
+  duracion_min: number;
+  precio: number;
+  descripcion: string;
+  color_hex: string;
+  activo: boolean;
+  creado_en?: string;
+  id_especialidad?: string;
+}
+
 interface ProfesionalForm {
   nombre: string;
   email: string;
   telefono: string;
   id_turno: string;
+  id_especialidad: string;
   activo: boolean;
 }
 
 interface Ausencia {
   id_bloqueo: string;
-  profesional_id: string; // alias → id_profesional en la tabla
+  profesional_id: string;
   negocio_id: string;
   fecha_inicio: string;
   fecha_fin: string;
@@ -51,7 +74,22 @@ const FORM_EMPTY: ProfesionalForm = {
   email: "",
   telefono: "",
   id_turno: "",
+  id_especialidad: "",
   activo: true,
+};
+
+// Especialidades predefinidas por tipo de negocio
+const ESPECIALIDADES_PREDEFINIDAS: Record<string, string[]> = {
+  barberia: ["Barbero", "Estilista", "Colorista", "Barbero Junior", "Maestro Barbero"],
+  salon_belleza: ["Estilista", "Colorista", "Manicurista", "Pedicurista", "Maquillador/a"],
+  nutricion: ["Nutricionista", "Dietista", "Nutricionista Deportivo", "Nutricionista Clínico"],
+  odontologia: ["Odontólogo General", "Ortodoncista", "Endodoncista", "Periodoncista", "Cirujano Maxilofacial"],
+  estetica: ["Esteticista", "Cosmetóloga", "Masajista", "Especialista en Depilación", "Terapeuta Facial"],
+  medicina: ["Médico General", "Especialista", "Enfermero/a", "Auxiliar"],
+  psicologia: ["Psicólogo Clínico", "Psicólogo Infantil", "Terapeuta", "Psicólogo Organizacional"],
+  fitness: ["Entrenador Personal", "Instructor de Yoga", "Instructor de Pilates", "Nutricionista Deportivo"],
+  veterinaria: ["Veterinario", "Asistente Veterinario", "Cirujano Veterinario", "Especialista en Exóticos"],
+  spa: ["Terapeuta de Masajes", "Esteticista", "Cosmetóloga", "Especialista en Tratamientos"],
 };
 
 function genId(prefix = "prof") {
@@ -59,14 +97,6 @@ function genId(prefix = "prof") {
 }
 
 // ─── Utilidad exportable: filtrar slots por ausencias ─────────────────────────
-/**
- * Dado un array de ausencias del profesional y una fecha (Date o string ISO),
- * retorna true si el profesional está ausente en esa fecha.
- *
- * Uso en generación de slots:
- *   const ausencias = await fetchAusencias(profesional_id);
- *   if (profesionalAusenteEnFecha(ausencias, slotFecha)) continue;
- */
 export function profesionalAusenteEnFecha(
   ausencias: Pick<Ausencia, "fecha_inicio" | "fecha_fin">[],
   fecha: Date | string
@@ -109,6 +139,15 @@ function IconCalendarClock({ className = "w-4 h-4" }: { className?: string }) {
       <path d="M3 10h6M3 4h18v6H3z" />
       <circle cx="16" cy="16" r="6" />
       <path d="M16 13v3l2 1" />
+    </svg>
+  );
+}
+
+function IconBriefcase({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
     </svg>
   );
 }
@@ -164,11 +203,12 @@ function profesionalToForm(p: Profesional): ProfesionalForm & { id_profesional: 
     email: p.email ?? "",
     telefono: p.telefono ?? "",
     id_turno: p.id_turno ?? "",
+    id_especialidad: p.id_especialidad ?? "",
     activo: p.activo,
   };
 }
 
-// ─── Modal de Ausencias ───────────────────────────────────────────────────────
+// ─── Modal de Ausencias (sin cambios) ────────────────────────────────────────
 function AusenciasModal({
   open,
   onClose,
@@ -185,7 +225,6 @@ function AusenciasModal({
   const [loadingAus, setLoadingAus] = useState(false);
   const [savingAus, setSavingAus] = useState(false);
 
-  // Form nueva ausencia
   const [form, setForm] = useState({
     fecha_inicio: "",
     fecha_fin: "",
@@ -278,7 +317,6 @@ function AusenciasModal({
       year: "numeric",
     });
 
-  // Clasifica ausencias en futuras/activas vs pasadas
   const now = new Date();
   const vigentes = ausencias.filter((a) => new Date(a.fecha_fin) >= now);
   const pasadas = ausencias.filter((a) => new Date(a.fecha_fin) < now);
@@ -291,7 +329,6 @@ function AusenciasModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-[var(--border)] flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <Avatar nombre={profesional.nombre} />
@@ -308,7 +345,6 @@ function AusenciasModal({
           </button>
         </div>
 
-        {/* Formulario nueva ausencia */}
         <div className="p-5 border-b border-[var(--border)] flex-shrink-0 flex flex-col gap-3">
           <p className="text-xs font-medium text-[var(--text-soft)] uppercase tracking-wide">
             Registrar nueva ausencia
@@ -371,7 +407,6 @@ function AusenciasModal({
                         : "border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text-soft)] hover:border-[var(--accent)]/40",
                     ].join(" ")}
                   >
-                    {/* Indicador tipo radio */}
                     <span
                       className={[
                         "w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors",
@@ -388,7 +423,6 @@ function AusenciasModal({
               })}
             </div>
 
-            {/* Campo libre si seleccionó "Otro" */}
             {form.motivoTipo === "otro" && (
               <input
                 autoFocus
@@ -401,7 +435,6 @@ function AusenciasModal({
           </div>
 
           <div className="flex items-center justify-between">
-            {/* Toggle todo el día — corregido para que la bolita no se salga */}
             <button
               type="button"
               onClick={() => setForm((f) => ({ ...f, todo_el_dia: !f.todo_el_dia }))}
@@ -436,7 +469,6 @@ function AusenciasModal({
           </div>
         </div>
 
-        {/* Lista de ausencias */}
         <div className="overflow-y-auto flex-1 p-5 flex flex-col gap-4">
           {loadingAus ? (
             <p className="text-sm text-[var(--text-soft)] text-center py-4">Cargando...</p>
@@ -449,7 +481,6 @@ function AusenciasModal({
             </div>
           ) : (
             <>
-              {/* Vigentes / próximas */}
               {vigentes.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-soft)]">
@@ -467,7 +498,6 @@ function AusenciasModal({
                 </div>
               )}
 
-              {/* Pasadas */}
               {pasadas.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-soft)]">
@@ -492,7 +522,6 @@ function AusenciasModal({
   );
 }
 
-// ─── Fila de ausencia individual ──────────────────────────────────────────────
 function AusenciaRow({
   ausencia,
   onDelete,
@@ -518,7 +547,6 @@ function AusenciaRow({
       ].join(" ")}
     >
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-        {/* Fechas */}
         <p className="text-xs font-medium leading-tight">
           {mismaFecha
             ? formatFecha(ausencia.fecha_inicio)
@@ -528,13 +556,11 @@ function AusenciaRow({
           )}
         </p>
 
-        {/* Motivo */}
         <p className="text-[11px] text-[var(--text-soft)] truncate">
           {ausencia.motivo || "Sin motivo especificado"}
         </p>
       </div>
 
-      {/* Botón eliminar */}
       <button
         onClick={() => onDelete(ausencia.id_bloqueo)}
         className="text-[11px] text-red-500 hover:text-red-600 hover:bg-red-500/10 px-2 py-1 rounded-lg transition flex-shrink-0"
@@ -545,34 +571,41 @@ function AusenciaRow({
   );
 }
 
-// ─── Tarjeta Profesional ──────────────────────────────────────────────────────
+// ─── Tarjeta Profesional CON ESPECIALIDAD ────────────────────────────────────
 function ProfesionalCard({
   profesional,
   turnoNombre,
+  especialidadNombre,
   onEdit,
   onAusencias,
   ausenciasCount,
 }: {
   profesional: Profesional;
   turnoNombre?: string;
+  especialidadNombre?: string;
   onEdit: (p: Profesional) => void;
   onAusencias: (p: Profesional) => void;
   ausenciasCount: number;
 }) {
   return (
     <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl flex flex-col gap-3 p-4 hover:border-[var(--accent)]/40 transition-all duration-150 h-full">
-      {/* Header */}
       <div className="flex flex-col gap-2">
-        {/* Fila 1: Avatar + Nombre + Badge */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <Avatar nombre={profesional.nombre} />
-            <p className="font-medium text-sm leading-tight line-clamp-2">{profesional.nombre}</p>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm leading-tight line-clamp-1">{profesional.nombre}</p>
+              {especialidadNombre && (
+                <p className="text-[10px] text-[var(--accent)] font-medium flex items-center gap-1 mt-0.5">
+                  <IconBriefcase className="w-3 h-3" />
+                  {especialidadNombre}
+                </p>
+              )}
+            </div>
           </div>
           <ActiveBadge activo={profesional.activo} />
         </div>
 
-        {/* Fila 2: Email + Botones */}
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] text-[var(--text-soft)] truncate flex-1 min-w-0">
             {profesional.email || "Sin email"}
@@ -588,10 +621,8 @@ function ProfesionalCard({
         </div>
       </div>
 
-      {/* Divider */}
       <div className="border-t border-[var(--border)]" />
 
-      {/* Información */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
         <div>
           <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide">Teléfono</p>
@@ -603,7 +634,6 @@ function ProfesionalCard({
         </div>
       </div>
 
-      {/* Botón ausencias */}
       <button
         onClick={() => onAusencias(profesional)}
         className={[
@@ -624,29 +654,57 @@ function ProfesionalCard({
   );
 }
 
-// ─── Modal Profesional ────────────────────────────────────────────────────────
+// ─── Modal Profesional CON ESPECIALIDAD ──────────────────────────────────────
 function ProfesionalModal({
   open,
   onClose,
   onSave,
   onDelete,
   turnos,
+  especialidades,
   inicial,
   loading,
+  negocioTipo,
+  onCrearEspecialidad,
+
 }: {
   open: boolean;
   onClose: () => void;
-  onSave: (form: ProfesionalForm, id?: string) => void;
+  onSave: (form: ProfesionalForm, id?: string, serviciosIds?: string[]) => void;
   onDelete?: (id: string) => void;
   turnos: Turno[];
+  especialidades: Especialidad[];
   inicial?: Partial<ProfesionalForm> & { id_profesional?: string };
   loading: boolean;
+  negocioTipo?: string;
+  onCrearEspecialidad: () => void;
+
+
 }) {
   const [form, setForm] = useState<ProfesionalForm>({ ...FORM_EMPTY, ...inicial });
+  const [servicios, setServicios] = useState<any[]>([]);
+  const [serviciosSeleccionados, setServiciosSeleccionados] = useState<string[]>([]);
 
   useEffect(() => {
     setForm({ ...FORM_EMPTY, ...inicial });
   }, [inicial, open]);
+  useEffect(() => {
+    const loadServicios = async () => {
+      if (!form.id_especialidad) return;
+
+      const supabase = createClient();
+
+      const { data } = await supabase
+        .from("servicios")
+        .select("*")
+        .eq("id_especialidad", form.id_especialidad)
+        .eq("activo", true);
+
+      setServicios(data || []);
+    };
+
+    loadServicios();
+  }, [form.id_especialidad]);
 
   if (!open) return null;
 
@@ -658,8 +716,8 @@ function ProfesionalModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
+      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border)] flex-shrink-0">
           <h2 className="font-medium text-base">
             {inicial?.id_profesional ? "Editar profesional" : "Nuevo profesional"}
           </h2>
@@ -671,7 +729,7 @@ function ProfesionalModal({
           </button>
         </div>
 
-        <div className="p-5 flex flex-col gap-4">
+        <div className="p-5 flex flex-col gap-4 overflow-y-auto flex-1">
           <div className="flex items-center gap-3">
             <Avatar nombre={form.nombre || "?"} />
             <span className="text-sm text-[var(--text-soft)]">
@@ -688,6 +746,67 @@ function ProfesionalModal({
               onChange={(e) => set("nombre", e.target.value)}
             />
           </div>
+
+          {/* SELECTOR DE ESPECIALIDAD */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-[var(--text-soft)]">Especialidad / Puesto *</label>
+              <button
+                type="button"
+                onClick={onCrearEspecialidad}
+                className="text-[10px] text-[var(--accent)] hover:underline"
+              >
+                + Crear nueva
+              </button>
+            </div>
+            <select
+              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              value={form.id_especialidad}
+              onChange={(e) => set("id_especialidad", e.target.value)}
+            >
+              <option value="">Seleccionar especialidad...</option>
+              {especialidades.map((esp) => (
+                <option key={esp.id_especialidad} value={esp.id_especialidad}>
+                  {esp.nombre}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-[var(--text-soft)] mt-1">
+              Define el rol o puesto del profesional (ej: Barbero, Nutricionista, Estilista)
+            </p>
+          </div>
+          {/* SERVICIOS SEGÚN ESPECIALIDAD */}
+          {form.id_especialidad && (
+            <div>
+              <label className="text-xs text-[var(--text-soft)] mb-2 block">
+                Servicios que puede realizar
+              </label>
+
+              <div className="flex flex-col gap-2 max-h-40 overflow-y-auto border border-[var(--border)] rounded-lg p-2">
+                {servicios.map((s) => (
+                  <label
+                    key={s.id_servicio}
+                    className="flex items-center gap-2 text-sm cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={serviciosSeleccionados.includes(s.id_servicio)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setServiciosSeleccionados((prev) => [...prev, s.id_servicio]);
+                        } else {
+                          setServiciosSeleccionados((prev) =>
+                            prev.filter((id) => id !== s.id_servicio)
+                          );
+                        }
+                      }}
+                    />
+                    {s.nombre}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -744,7 +863,7 @@ function ProfesionalModal({
           </div>
         </div>
 
-        <div className="flex gap-2 p-5 border-t border-[var(--border)]">
+        <div className="flex gap-2 p-5 border-t border-[var(--border)] flex-shrink-0">
           {inicial?.id_profesional && onDelete && (
             <button
               onClick={() => onDelete(inicial.id_profesional!)}
@@ -760,8 +879,8 @@ function ProfesionalModal({
             Cancelar
           </button>
           <button
-            onClick={() => onSave(form, inicial?.id_profesional)}
-            disabled={loading || !form.nombre.trim()}
+            onClick={() => onSave(form, inicial?.id_profesional, serviciosSeleccionados)}
+            disabled={loading || !form.nombre.trim() || !form.id_especialidad}
             className="flex-1 py-2 rounded-lg text-sm font-medium text-white transition disabled:opacity-40"
             style={{ background: "var(--accent)" }}
           >
@@ -773,27 +892,232 @@ function ProfesionalModal({
   );
 }
 
-// ─── Página principal ─────────────────────────────────────────────────────────
+// ─── Modal Gestión de Especialidades ─────────────────────────────────────────
+function EspecialidadesModal({
+  open,
+  onClose,
+  especialidades,
+  negocioTipo,
+  onReload,
+  negocioId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  especialidades: Especialidad[];
+  negocioTipo?: string;
+  onReload: () => void;
+  negocioId: string;
+}) {
+  const supabase = createClient();
+  const [nuevaEsp, setNuevaEsp] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const predefinidas = negocioTipo ? ESPECIALIDADES_PREDEFINIDAS[negocioTipo] || [] : [];
+
+  const handleCrear = async () => {
+    if (!nuevaEsp.trim()) {
+      toast.error("Ingresá el nombre de la especialidad");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("especialidades").insert([
+        {
+          id_especialidad: genId("esp"),
+          negocio_id: negocioId,
+          nombre: nuevaEsp.trim(),
+          sector: negocioTipo || "general",
+          activo: true,
+        },
+      ]);
+      if (error) throw error;
+      toast.success("Especialidad creada ✅");
+      setNuevaEsp("");
+      onReload();
+    } catch {
+      toast.error("Error creando especialidad ❌");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEliminar = async (id: string) => {
+    if (!confirm("¿Eliminar esta especialidad? Los profesionales asignados quedarán sin especialidad.")) return;
+    try {
+      await supabase.from("especialidades").delete().eq("id_especialidad", id);
+      toast.success("Especialidad eliminada ✅");
+      onReload();
+    } catch {
+      toast.error("Error eliminando ❌");
+    }
+  };
+
+  const handleCrearPredefinida = async (nombre: string) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("especialidades").insert([
+        {
+          id_especialidad: genId("esp"),
+          nombre,
+          sector: negocioTipo || "general",
+          activo: true,
+          negocio_id: negocioId,
+        },
+      ]);
+      if (error) throw error;
+      toast.success(`"${nombre}" agregada ✅`);
+      onReload();
+    } catch (err) {
+      console.error("ERROR CREANDO ESPECIALIDAD:", err);
+      toast.error("Error creando especialidad ❌");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) return null;
+
+  const existentes = especialidades.map((e) => e.nombre.toLowerCase());
+  const predisponibles = predefinidas.filter((p) => !existentes.includes(p.toLowerCase()));
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border)] flex-shrink-0">
+          <div>
+            <h2 className="font-medium text-base">Gestionar especialidades</h2>
+            <p className="text-[11px] text-[var(--text-soft)] mt-0.5">
+              Define los roles o puestos de tus profesionales
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-5 border-b border-[var(--border)] flex-shrink-0 flex flex-col gap-3">
+          <p className="text-xs font-medium text-[var(--text-soft)] uppercase tracking-wide">
+            Crear nueva especialidad
+          </p>
+          <div className="flex gap-2">
+            <input
+              className="flex-1 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              placeholder="Ej: Barbero Senior, Nutricionista Deportivo..."
+              value={nuevaEsp}
+              onChange={(e) => setNuevaEsp(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCrear()}
+            />
+            <button
+              onClick={handleCrear}
+              disabled={saving || !nuevaEsp.trim()}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white transition disabled:opacity-40"
+              style={{ background: "var(--accent)" }}
+            >
+              Crear
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-5 flex flex-col gap-4">
+          {/* Especialidades existentes */}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-soft)] mb-2">
+              Tus especialidades · {especialidades.length}
+            </p>
+            {especialidades.length === 0 ? (
+              <p className="text-sm text-[var(--text-soft)] text-center py-4">
+                No hay especialidades creadas aún
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {especialidades.map((esp) => (
+                  <div
+                    key={esp.id_especialidad}
+                    className="flex items-center justify-between p-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg"
+                  >
+                    <div className="flex items-center gap-2">
+                      <IconBriefcase className="w-4 h-4 text-[var(--accent)]" />
+                      <span className="text-sm font-medium">{esp.nombre}</span>
+                    </div>
+                    <button
+                      onClick={() => handleEliminar(esp.id_especialidad)}
+                      className="text-[11px] text-red-500 hover:text-red-600 hover:bg-red-500/10 px-2 py-1 rounded-lg transition"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sugerencias predefinidas */}
+          {predisponibles.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-soft)] mb-2">
+                Sugerencias para {negocioTipo?.replace("_", " ")}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {predisponibles.map((nombre) => (
+                  <button
+                    key={nombre}
+                    onClick={() => handleCrearPredefinida(nombre)}
+                    disabled={saving}
+                    className="px-3 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-lg text-xs text-[var(--accent)] hover:bg-[var(--accent)]/20 transition disabled:opacity-40"
+                  >
+                    + {nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Página principal MEJORADA ────────────────────────────────────────────────
 function ProfesionalesPage() {
+
+
+  const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [serviciosSeleccionados, setServiciosSeleccionados] = useState<string[]>([]);
+
+
   const supabase = createClient();
   const { negocio } = useNegocio();
 
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
+  const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // ausenciasVigentes: { [id_profesional]: number }
+
   const [ausenciasVigentes, setAusenciasVigentes] = useState<Record<string, number>>({});
 
   const [busqueda, setBusqueda] = useState("");
   const [filtroActivo, setFiltroActivo] = useState<"todos" | "activo" | "inactivo">("todos");
+  const [filtroEspecialidad, setFiltroEspecialidad] = useState<string>("todas");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState<Profesional | null>(null);
 
-  // Modal ausencias
+
   const [ausenciasModal, setAusenciasModal] = useState<Profesional | null>(null);
+  const [especialidadesModalOpen, setEspecialidadesModalOpen] = useState(false);
+
+  useEffect(() => {
+    console.log("SERVICIOS CARGADOS:", servicios);
+  }, [servicios]);
 
   const loadProfesionales = useCallback(async () => {
     if (!negocio?.id) return;
@@ -807,7 +1131,36 @@ function ProfesionalesPage() {
     setLoading(false);
   }, [negocio?.id]);
 
-  // Carga conteo de ausencias vigentes por profesional
+  const loadServicios = async () => {
+    if (!negocio?.id) return;
+
+    const { data } = await supabase
+      .from("servicios")
+      .select("*")
+      .eq("negocio_id", negocio.id)
+      .order("nombre");
+
+    setServicios(data || []);
+  };
+
+  const loadServiciosProfesional = async (profId: string) => {
+    const { data } = await supabase
+      .from("profesional_servicios")
+      .select("servicio_id")
+      .eq("profesional_id", profId);
+
+    setServiciosSeleccionados(data?.map((d) => d.servicio_id) || []);
+  };
+
+  const loadEspecialidades = useCallback(async () => {
+    const { data } = await supabase
+      .from("especialidades")
+      .select("*")
+      .eq("activo", true)
+      .order("nombre", { ascending: true });
+    setEspecialidades((data as Especialidad[]) || []);
+  }, []);
+
   const loadAusenciasVigentes = useCallback(async () => {
     if (!negocio?.id) return;
     const ahora = new Date().toISOString();
@@ -815,7 +1168,7 @@ function ProfesionalesPage() {
       .from("bloqueos_profesional")
       .select("id_profesional")
       .eq("negocio_id", negocio.id)
-      .gte("fecha_fin", ahora); // fin >= ahora → vigente
+      .gte("fecha_fin", ahora);
     const counts: Record<string, number> = {};
     (data || []).forEach((r: { id_profesional: string }) => {
       counts[r.id_profesional] = (counts[r.id_profesional] || 0) + 1;
@@ -824,8 +1177,20 @@ function ProfesionalesPage() {
   }, [negocio?.id]);
 
   useEffect(() => {
+    if (!editando?.id_profesional) return;
+
+    const load = async () => {
+      await loadServiciosProfesional(editando.id_profesional);
+    };
+
+    load();
+  }, [editando]);
+
+  useEffect(() => {
     if (!negocio?.id) return;
     loadProfesionales();
+    loadEspecialidades();
+    loadServicios();
     loadAusenciasVigentes();
     supabase
       .from("turnos")
@@ -833,25 +1198,59 @@ function ProfesionalesPage() {
       .eq("negocio_id", negocio.id)
       .eq("activo", true)
       .then(({ data }) => setTurnos((data as Turno[]) || []));
-  }, [negocio?.id, loadProfesionales, loadAusenciasVigentes]);
+  }, [negocio?.id, loadProfesionales, loadEspecialidades, loadAusenciasVigentes]);
 
-  const handleSave = async (form: ProfesionalForm, id?: string) => {
+  const handleSave = async (form: ProfesionalForm, id?: string, serviciosIds: string[] = []) => {
     if (!negocio?.id) return;
+
     setSaving(true);
+
     try {
+      let profesionalId = id;
+
       if (id) {
-        await supabase.from("profesionales").update({ ...form }).eq("id_profesional", id);
-        toast.success("Profesional actualizado ✅");
+        await supabase
+          .from("profesionales")
+          .update({ ...form })
+          .eq("id_profesional", id);
       } else {
+        const nuevoId = "PROF_" + Date.now().toString(36);
+
         await supabase.from("profesionales").insert([
-          { ...form, id_profesional: genId("prof"), negocio_id: negocio.id },
+          {
+            ...form,
+            id_profesional: nuevoId,
+            negocio_id: negocio.id,
+          },
         ]);
-        toast.success("Profesional creado ✅");
+
+        profesionalId = nuevoId;
       }
+
+      // 🧠 BORRAR RELACIONES ANTERIORES
+      await supabase
+        .from("profesional_servicios")
+        .delete()
+        .eq("profesional_id", profesionalId);
+
+      // 🚀 INSERTAR NUEVAS
+      if (serviciosIds.length > 0) {
+        const inserts = serviciosIds.map((servicioId) => ({
+          profesional_id: profesionalId,
+          servicio_id: servicioId,
+        }));
+
+        await supabase.from("profesional_servicios").insert(inserts);
+      }
+
+      toast.success("Profesional guardado ✅");
+
       setModalOpen(false);
       setEditando(null);
       loadProfesionales();
-    } catch {
+
+    } catch (err) {
+      console.error(err);
       toast.error("Error guardando ❌");
     } finally {
       setSaving(false);
@@ -874,6 +1273,9 @@ function ProfesionalesPage() {
   const getTurnoNombre = (id_turno: string) =>
     turnos.find((t) => t.id_turno === id_turno)?.nombre_turno;
 
+  const getEspecialidadNombre = (id_especialidad: string) =>
+    especialidades.find((e) => e.id_especialidad === id_especialidad)?.nombre;
+
   const filtrados = profesionales.filter((p) => {
     const matchBusq =
       !busqueda ||
@@ -883,7 +1285,10 @@ function ProfesionalesPage() {
       filtroActivo === "todos" ||
       (filtroActivo === "activo" && p.activo) ||
       (filtroActivo === "inactivo" && !p.activo);
-    return matchBusq && matchActivo;
+    const matchEsp =
+      filtroEspecialidad === "todas" ||
+      p.id_especialidad === filtroEspecialidad;
+    return matchBusq && matchActivo && matchEsp;
   });
 
   const activos = profesionales.filter((p) => p.activo).length;
@@ -898,17 +1303,26 @@ function ProfesionalesPage() {
             {activos} activo{activos !== 1 ? "s" : ""} · {profesionales.length} total
           </p>
         </div>
-        <button
-          onClick={() => {
-            setEditando(null);
-            setModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white hover:opacity-90 transition"
-          style={{ background: "var(--accent)" }}
-        >
-          <span className="text-base leading-none">+</span>
-          Nuevo profesional
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setEspecialidadesModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-[var(--border)] hover:bg-[var(--bg-soft)] transition"
+          >
+            <IconBriefcase className="w-4 h-4" />
+            Especialidades
+          </button>
+          <button
+            onClick={() => {
+              setEditando(null);
+              setModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white hover:opacity-90 transition"
+            style={{ background: "var(--accent)" }}
+          >
+            <span className="text-base leading-none">+</span>
+            Nuevo profesional
+          </button>
+        </div>
       </div>
 
       {/* Controles */}
@@ -919,6 +1333,19 @@ function ProfesionalesPage() {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
+
+        <select
+          className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+          value={filtroEspecialidad}
+          onChange={(e) => setFiltroEspecialidad(e.target.value)}
+        >
+          <option value="todas">Todas las especialidades</option>
+          {especialidades.map((esp) => (
+            <option key={esp.id_especialidad} value={esp.id_especialidad}>
+              {esp.nombre}
+            </option>
+          ))}
+        </select>
 
         <select
           className="bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
@@ -960,9 +1387,12 @@ function ProfesionalesPage() {
               key={p.id_profesional}
               profesional={p}
               turnoNombre={getTurnoNombre(p.id_turno ?? "")}
+              especialidadNombre={getEspecialidadNombre(p.id_especialidad ?? "")}
               onEdit={(p) => {
                 setEditando(p);
                 setModalOpen(true);
+
+                loadServiciosProfesional(p.id_profesional);
               }}
               onAusencias={(p) => setAusenciasModal(p)}
               ausenciasCount={ausenciasVigentes[p.id_profesional] || 0}
@@ -981,8 +1411,16 @@ function ProfesionalesPage() {
         onSave={handleSave}
         onDelete={handleDelete}
         turnos={turnos}
+        especialidades={especialidades}
         inicial={editando ? profesionalToForm(editando) : undefined}
         loading={saving}
+        negocioTipo={negocio?.neg_tipo}
+        onCrearEspecialidad={() => {
+          setModalOpen(false);
+          setEspecialidadesModalOpen(true);
+        }}
+
+
       />
 
       {/* Modal ausencias */}
@@ -991,9 +1429,24 @@ function ProfesionalesPage() {
           open={!!ausenciasModal}
           onClose={() => {
             setAusenciasModal(null);
-            loadAusenciasVigentes(); // refresca conteos al cerrar
+            loadAusenciasVigentes();
           }}
           profesional={ausenciasModal}
+          negocioId={negocio.id}
+        />
+      )}
+
+      {/* Modal especialidades */}
+      {negocio?.id && (
+        <EspecialidadesModal
+          open={especialidadesModalOpen}
+          onClose={() => {
+            setEspecialidadesModalOpen(false);
+            if (editando) setModalOpen(true);
+          }}
+          especialidades={especialidades}
+          negocioTipo={negocio.neg_tipo}
+          onReload={loadEspecialidades}
           negocioId={negocio.id}
         />
       )}
