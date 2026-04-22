@@ -34,14 +34,21 @@ const DIAS = [
     { key: "domingo", label: "Domingo" },
 ];
 
+const DIA_INDEX: Record<string, number> = {
+    lunes: 1, martes: 2, miercoles: 3, jueves: 4,
+    viernes: 5, sabado: 6, domingo: 0
+};
+
 function EmpresaPage() {
     const supabase = createClient();
     const { negocio, loading: negocioLoading } = useNegocio();
 
     const [form, setForm] = useState<any>({});
     const [saving, setSaving] = useState(false);
-    const [activeDays, setActiveDays] = useState<string[]>(["lunes", "martes", "miercoles", "jueves", "viernes"]); // días activos por defecto
+    const [activeDays, setActiveDays] = useState<string[]>(["lunes", "martes", "miercoles", "jueves", "viernes"]);
+    const [horarios, setHorarios] = useState<Record<string, { inicio: string; fin: string }>>({});
     const [loadingData, setLoadingData] = useState(true);
+
     // Cargar datos completos
     useEffect(() => {
         if (!negocio?.id) return;
@@ -57,11 +64,53 @@ function EmpresaPage() {
 
             if (data) setForm(data);
 
+            // Cargar horarios existentes
+            const { data: horariosData } = await supabase
+                .from("config_negocio_horario")
+                .select("*")
+                .eq("negocio_id", negocio.id);
+
+            if (horariosData && horariosData.length > 0) {
+                const INDEX_DIA: Record<number, string> = {
+                    1: "lunes", 2: "martes", 3: "miercoles", 4: "jueves",
+                    5: "viernes", 6: "sabado", 0: "domingo"
+                };
+                const diasActivos: string[] = [];
+                const horariosMap: Record<string, { inicio: string; fin: string }> = {};
+
+                horariosData.forEach((h) => {
+                    const diaKey = INDEX_DIA[h.dia_semana];
+                    if (diaKey && h.activo) diasActivos.push(diaKey);
+                    if (diaKey) {
+                        horariosMap[diaKey] = {
+                            inicio: h.hora_inicio?.slice(0, 5) || "08:00",
+                            fin: h.hora_fin?.slice(0, 5) || "18:00",
+                        };
+                    }
+                });
+
+                setActiveDays(diasActivos);
+                setHorarios(horariosMap);
+            }
+
             setLoadingData(false);
         };
 
         loadFullData();
     }, [negocio?.id, supabase]);
+
+    useEffect(() => {
+        if (loadingData) return;
+
+        if (window.location.hash === '#horarios') {
+            const el = document.getElementById('horarios');
+            if (el) {
+                setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 300);
+            }
+        }
+    }, [loadingData]);
 
     const updateField = (key: string, value: any) => {
         setForm((prev: any) => ({ ...prev, [key]: value }));
@@ -92,6 +141,8 @@ function EmpresaPage() {
                 ...form,
                 actualizado_en: new Date().toISOString(),
             };
+            console.log('guardando payload:', { neg_tipo: payload.neg_tipo, neg_ciudad: payload.neg_ciudad, neg_moneda: payload.neg_moneda }); // 👈
+
 
             const { error } = await supabase
                 .from("config_negocio")
@@ -100,33 +151,25 @@ function EmpresaPage() {
 
             if (error) throw error;
 
-            // 🔥 NORMALIZAR (evita undefined)
             const updatedNegocio = {
                 ...negocio,
-
-                // UI (lo que realmente usas en toda la app)
                 nombre: payload.neg_nombre || negocio.nombre || "Mi negocio",
                 color: payload.neg_color_acento || negocio.color || "#c9a96e",
                 logo: payload.neg_logo_url || negocio.logo || null,
                 ciudad: payload.neg_ciudad || negocio.ciudad || "",
-
-                // Compatibilidad (por si algún componente usa nombres BD)
                 neg_nombre: payload.neg_nombre,
                 neg_color_acento: payload.neg_color_acento,
                 neg_logo_url: payload.neg_logo_url,
                 neg_ciudad: payload.neg_ciudad,
             };
 
-            // 🔥 1. ACTUALIZAR CACHE GLOBAL (CLAVE)
             setNegocioGlobal(updatedNegocio);
 
-            // 🔥 2. APLICAR BRANDING INMEDIATO
             document.documentElement.style.setProperty(
                 "--accent",
                 updatedNegocio.color
             );
 
-            // 🔥 3. ACTUALIZAR FORM LOCAL
             setForm((prev: any) => ({
                 ...prev,
                 ...payload,
@@ -141,6 +184,34 @@ function EmpresaPage() {
             setSaving(false);
         }
     };
+
+    const saveHorarios = async () => {
+        if (!negocio?.id) return toast.error("No se encontró el negocio");
+        setSaving(true);
+        try {
+            const rows = activeDays.map(dia => ({
+                negocio_id: negocio.id,
+                dia_semana: DIA_INDEX[dia],
+                hora_inicio: horarios[dia]?.inicio || "08:00",
+                hora_fin: horarios[dia]?.fin || "18:00",
+                intervalo_min: form.neg_intervalo_min || 30,
+                activo: true
+            }));
+
+            const { error } = await supabase
+                .from("config_negocio_horario")
+                .upsert(rows, { onConflict: "negocio_id,dia_semana" });
+
+            if (error) throw error;
+            toast.success("✅ Horario guardado");
+        } catch (err) {
+            console.error(err);
+            toast.error("❌ Error al guardar horario");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleDiscard = () => window.location.reload();
 
     if (negocioLoading || loadingData) {
@@ -203,6 +274,7 @@ function EmpresaPage() {
                     <div>
                         <label className="text-xs font-medium text-[var(--text-soft)] uppercase tracking-wide mb-2 block">Tipo de negocio</label>
                         <select className="w-full h-11 border border-[var(--border)] bg-[var(--bg)] rounded-xl px-4 text-sm" value={form.neg_tipo || ""} onChange={(e) => updateField("neg_tipo", e.target.value)}>
+                            <option value="">Selecciona tipo</option>
                             {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                         </select>
                     </div>
@@ -213,6 +285,7 @@ function EmpresaPage() {
                     <div>
                         <label className="text-xs font-medium text-[var(--text-soft)] uppercase tracking-wide mb-2 block">Moneda</label>
                         <select className="w-full h-11 border border-[var(--border)] bg-[var(--bg)] rounded-xl px-4 text-sm" value={form.neg_moneda || "₡"} onChange={(e) => updateField("neg_moneda", e.target.value)}>
+                            <option value="">Selecciona moneda</option>
                             {MONEDAS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                         </select>
                     </div>
@@ -312,8 +385,8 @@ function EmpresaPage() {
                 </div>
             </div>
 
-            {/* 4. Horario y operaciones - DÍAS SELECCIONABLES */}
-            <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-6">
+            {/* 4. Horario y operaciones */}
+            <div id="horarios" className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-6">
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[var(--border)]">
                     <div className="w-9 h-9 rounded-xl bg-[var(--accent-10)] flex items-center justify-center">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
@@ -334,9 +407,25 @@ function EmpresaPage() {
                                 className="w-5 h-5 accent-[var(--accent)] cursor-pointer"
                             />
                             <span className="w-28 font-medium text-sm">{dia.label}</span>
-                            <input type="time" className="h-10 border border-[var(--border)] bg-[var(--bg)] rounded-xl px-3 text-sm w-32" />
+                            <input
+                                type="time"
+                                className="h-10 border border-[var(--border)] bg-[var(--bg)] rounded-xl px-3 text-sm w-32"
+                                value={horarios[dia.key]?.inicio || "08:00"}
+                                onChange={(e) => setHorarios(prev => ({
+                                    ...prev,
+                                    [dia.key]: { inicio: prev[dia.key]?.inicio || "08:00", fin: e.target.value }
+                                }))}
+                            />
                             <span className="text-[var(--text-soft)]">a</span>
-                            <input type="time" className="h-10 border border-[var(--border)] bg-[var(--bg)] rounded-xl px-3 text-sm w-32" />
+                            <input
+                                type="time"
+                                className="h-10 border border-[var(--border)] bg-[var(--bg)] rounded-xl px-3 text-sm w-32"
+                                value={horarios[dia.key]?.fin || "18:00"}
+                                onChange={(e) => setHorarios(prev => ({
+                                    ...prev,
+                                    [dia.key]: { inicio: e.target.value, fin: prev[dia.key]?.fin || "18:00" }
+                                }))}
+                            />
                         </div>
                     ))}
                 </div>
@@ -355,7 +444,7 @@ function EmpresaPage() {
                 </div>
 
                 <div className="flex justify-end mt-8">
-                    <button onClick={saveSection} disabled={saving} className="px-6 py-2.5 bg-[var(--accent)] text-white rounded-xl text-sm font-medium">
+                    <button onClick={saveHorarios} disabled={saving} className="px-6 py-2.5 bg-[var(--accent)] text-white rounded-xl text-sm font-medium">
                         {saving ? "Guardando..." : "Guardar Horario"}
                     </button>
                 </div>

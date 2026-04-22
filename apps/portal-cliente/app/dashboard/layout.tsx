@@ -8,6 +8,9 @@ import { MobileMenu } from "@/components/layout/MobileMenu";
 import { useEffect, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { useUsuario } from "@/lib/hooks/useUsuario";
+import { useOnboarding } from "@/lib/hooks/useOnboarding";
+import { OnboardingProgress } from "@/components/onboarding/OnboardingProgress";
+
 
 export default function DashboardLayout({
     children,
@@ -16,7 +19,16 @@ export default function DashboardLayout({
 }) {
     const { negocio } = useNegocio();
     const { usuario, loading: usuarioLoading } = useUsuario();
+    const {
+        data: onboardingData,
+        loading: onboardingLoading,
+        shouldShow,
+        navigateToStep,
+        completeOnboarding
+    } = useOnboarding(negocio?.id);
 
+    console.log('onboarding:', { onboardingData, onboardingLoading, shouldShow, negocioId: negocio?.id });
+    console.log('negocio:', negocio);
     const [theme, setTheme] = useState<"dark" | "light">("dark");
 
     useEffect(() => {
@@ -78,6 +90,18 @@ export default function DashboardLayout({
                     theme={theme}
                     toggleTheme={toggleTheme}
                 />
+
+                {!onboardingLoading && shouldShow && onboardingData && (
+                    <OnboardingProgress
+                        currentStep={onboardingData.currentStep}
+                        totalSteps={onboardingData.totalSteps}
+                        progress={onboardingData.progress}
+                        steps={onboardingData.steps}
+                        completedSteps={onboardingData.completedSteps}
+                        onNavigate={navigateToStep}
+                        onComplete={completeOnboarding}
+                    />
+                )}
 
                 <main className="flex-1 p-6 lg:p-8 overflow-y-auto pb-20 md:pb-8">
                     {children}

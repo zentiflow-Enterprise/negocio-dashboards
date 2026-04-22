@@ -25,8 +25,7 @@ export function Topbar({
 
     const nombre = negocio?.nombre || "Mi negocio";
     const ciudad = negocio?.ciudad || "";
-    console.log("neg_logo_url:", negocio?.neg_logo_url);
-    console.log("negocio completo:", negocio);
+
 
     return (
         <div className="h-16 border-b border-[var(--border)] flex items-center justify-between px-6 bg-[var(--bg)] transition-all">
