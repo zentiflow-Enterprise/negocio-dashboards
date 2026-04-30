@@ -71,7 +71,7 @@ export function OnboardingProgress({
                                         Configuración inicial
                                     </h3>
                                     <p className="text-xs text-gray-600 dark:text-gray-400">
-                                        {currentStep} de {totalSteps} pasos completados
+                                        {completedSteps.length} de {totalSteps} pasos completados
                                     </p>
                                 </div>
                             </div>
@@ -139,7 +139,10 @@ export function OnboardingProgress({
 
                         {currentStepData?.isFinal && (
                             <button
-                                onClick={onComplete}
+                                onClick={() => {
+                                    console.log('Finalizar clicked');
+                                    onComplete();
+                                }}
                                 className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2 font-medium shadow-md hover:shadow-lg text-sm"
                             >
                                 <Check size={16} />

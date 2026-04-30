@@ -61,13 +61,16 @@ export function useOnboarding(negocioId?: string) {
 
             // 4. Auto-actualizar si está completado
             if (progress.isCompleted && negocio?.onboarding_status !== 'completed') {
-                await supabase
+                const { error } = await supabase   // 👈 agrega esto
                     .from('negocios')
                     .update({
                         onboarding_status: 'completed',
                         onboarding_step: ONBOARDING_STEPS.length
                     })
                     .eq('negocio_id', negocioId);
+                console.log('update completed error:', error);
+                console.log('isCompleted:', progress.isCompleted);
+                console.log('onboarding_status:', negocio?.onboarding_status);
             } else if (progress.currentStep !== negocio?.onboarding_step) {
                 // Actualizar step actual
                 await supabase
@@ -83,7 +86,7 @@ export function useOnboarding(negocioId?: string) {
                 progress: progress.progress,
                 completedSteps: progress.completedSteps,
                 isCompleted: progress.isCompleted,
-                shouldShow: !progress.isCompleted,
+                shouldShow: negocio?.onboarding_status !== 'completed',
                 steps: ONBOARDING_STEPS
             });
 
@@ -97,6 +100,10 @@ export function useOnboarding(negocioId?: string) {
     useEffect(() => {
         fetchStatus();
     }, [negocioId, pathname]);
+    useEffect(() => {
+        window.addEventListener('onboarding-refresh', fetchStatus);
+        return () => window.removeEventListener('onboarding-refresh', fetchStatus);
+    }, [negocioId]);
 
     const completeOnboarding = async () => {
         if (!negocioId) return;
@@ -111,6 +118,7 @@ export function useOnboarding(negocioId?: string) {
                 .eq('negocio_id', negocioId);
 
             await fetchStatus();
+            router.push('/dashboard'); // 👈 agrega esto
         } catch (error) {
             console.error('Error completing onboarding:', error);
         }

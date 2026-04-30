@@ -174,8 +174,8 @@ function EmpresaPage() {
                 ...prev,
                 ...payload,
             }));
-
-            toast.success("✅ Guardado correctamente");
+            window.dispatchEvent(new Event('onboarding-refresh'));
+            toast.success("Guardado correctamente");
 
         } catch (err) {
             console.error(err);
@@ -203,7 +203,8 @@ function EmpresaPage() {
                 .upsert(rows, { onConflict: "negocio_id,dia_semana" });
 
             if (error) throw error;
-            toast.success("✅ Horario guardado");
+            window.dispatchEvent(new Event('onboarding-refresh'));
+            toast.success("Horario guardado");
         } catch (err) {
             console.error(err);
             toast.error("❌ Error al guardar horario");
