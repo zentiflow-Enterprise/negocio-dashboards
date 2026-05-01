@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { CountrySelect, CountryCode } from "@/components/ui/CountrySelect";
+import { SimpleSelect } from "@/components/ui/SimpleSelect";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Cliente {
@@ -315,16 +316,17 @@ function ClienteModal({
 
           <div>
             <label className="text-xs text-[var(--text-soft)] mb-1 block">Origen</label>
-            <select
-              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+            <SimpleSelect
               value={form.origen}
-              onChange={(e) => set("origen", e.target.value)}
-            >
-              <option value="manual">Manual</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="telegram">Telegram</option>
-              <option value="web">Web / Portal</option>
-            </select>
+              onChange={(v) => set("origen", v)}
+              options={[
+                { value: "manual", label: "Manual" },
+                { value: "whatsapp", label: "WhatsApp" },
+                { value: "telegram", label: "Telegram" },
+                { value: "portal", label: "Portal" },
+                { value: "referido", label: "Referido" },
+              ]}
+            />
           </div>
 
           <div className="flex items-center justify-between bg-[var(--bg-soft)] rounded-lg px-3 py-2">
@@ -336,7 +338,7 @@ function ClienteModal({
                 }`}
             >
               <span
-                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.portal_habilitado ? "translate-x-5.5" : ""
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.portal_habilitado ? "translate-x-5" : "translate-x-0"
                   }`}
               />
             </button>

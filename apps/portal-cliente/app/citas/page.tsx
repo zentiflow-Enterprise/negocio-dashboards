@@ -14,6 +14,7 @@ import { CalendarX2, CalendarOff, Inbox, SearchX, Ghost } from "lucide-react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { CountrySelect, CountryCode } from "@/components/ui/CountrySelect";
+import { SimpleSelect } from "@/components/ui/SimpleSelect";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Cita {
@@ -565,13 +566,19 @@ function ClienteBuscador({ clientes, value, onChange, onCrearCliente }: {
       <input className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" placeholder="Buscar por nombre o teléfono..." value={seleccionado ? seleccionado.nombre : query} onFocus={() => { setAbierto(true); if (seleccionado) setQuery(""); }} onBlur={() => setTimeout(() => setAbierto(false), 150)} onChange={(e) => { setQuery(e.target.value); onChange(""); }} />
       {abierto && (
         <div className="absolute z-50 w-full mt-1 bg-[var(--bg)] border border-[var(--border)] rounded-xl shadow-xl max-h-52 overflow-y-auto">
+          {/* ← Crear primero */}
+          <div
+            className="px-3 py-2 text-sm text-[var(--accent)] font-medium border-b border-[var(--border)] cursor-pointer hover:bg-[var(--bg-soft)]"
+            onMouseDown={onCrearCliente}
+          >
+            + Crear cliente nuevo
+          </div>
           {filtrados.length > 0 ? filtrados.map((c) => (
             <div key={c.cliente_id} className="px-3 py-2 cursor-pointer hover:bg-[var(--bg-soft)]" onMouseDown={() => { onChange(c.cliente_id); setQuery(""); setAbierto(false); }}>
               <div className="text-sm">{c.nombre}</div>
               {c.id_whatsapp && <div className="text-xs text-[var(--text-soft)]">📱 {c.id_whatsapp}</div>}
             </div>
           )) : <div className="px-3 py-2 text-sm text-[var(--text-soft)]">Sin resultados</div>}
-          <div className="px-3 py-2 text-sm text-[var(--accent)] font-medium border-t border-[var(--border)] cursor-pointer hover:bg-[var(--bg-soft)]" onMouseDown={onCrearCliente}>+ Crear cliente nuevo</div>
         </div>
       )}
     </div>
@@ -846,18 +853,28 @@ function ClienteModal({ open, onClose, onSave, loading }: {
           </div>
           <div>
             <label className="text-xs text-[var(--text-soft)] mb-1 block">Origen</label>
-            <select className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.origen} onChange={(e) => set("origen", e.target.value)}>
-              <option value="manual">Manual</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="telegram">Telegram</option>
-              <option value="portal">Web / Portal</option>
-              <option value="referido">Referido</option>
-            </select>
+            <SimpleSelect
+              value={form.origen}
+              onChange={(v) => set("origen", v)}
+              options={[
+                { value: "manual", label: "Manual" },
+                { value: "whatsapp", label: "WhatsApp" },
+                { value: "telegram", label: "Telegram" },
+                { value: "portal", label: "Portal" },
+                { value: "referido", label: "Referido" },
+              ]}
+            />
           </div>
           <div className="flex items-center justify-between bg-[var(--bg-soft)] rounded-lg px-3 py-2">
             <span className="text-sm">Portal de clientes habilitado</span>
-            <button type="button" onClick={() => set("portal_habilitado", !form.portal_habilitado)} className={`relative w-11 h-6 rounded-full transition-colors ${form.portal_habilitado ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}>
-              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.portal_habilitado ? "translate-x-5.5" : ""}`} />
+            <button
+              type="button"
+              onClick={() => set("portal_habilitado", !form.portal_habilitado)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${form.portal_habilitado ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.portal_habilitado ? "translate-x-5" : "translate-x-0"}`}
+              />
             </button>
           </div>
         </div>
