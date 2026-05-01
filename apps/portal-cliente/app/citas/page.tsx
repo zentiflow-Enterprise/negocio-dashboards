@@ -11,6 +11,9 @@ import { DayPicker } from "react-day-picker";
 import { es } from "react-day-picker/locale";
 import "react-day-picker/dist/style.css";
 import { CalendarX2, CalendarOff, Inbox, SearchX, Ghost } from "lucide-react";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
+import { CountrySelect, CountryCode } from "@/components/ui/CountrySelect";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Cita {
@@ -61,6 +64,7 @@ interface ClienteForm {
   id_whatsapp: string;
   origen: string;
   portal_habilitado: boolean;
+  pais: CountryCode;
 }
 
 interface HorarioDia {
@@ -796,11 +800,12 @@ function CitaModal({
 function ClienteModal({ open, onClose, onSave, loading }: {
   open: boolean; onClose: () => void; onSave: (form: ClienteForm) => void; loading: boolean;
 }) {
-  const EMPTY: ClienteForm = { nombre: "", email: "", id_whatsapp: "", origen: "manual", portal_habilitado: false };
+  const EMPTY: ClienteForm = { nombre: "", email: "", id_whatsapp: "", origen: "manual", portal_habilitado: false, pais: "CR" };
   const [form, setForm] = useState<ClienteForm>({ ...EMPTY });
   useEffect(() => { if (!open) setForm({ ...EMPTY }); }, [open]);
   if (!open) return null;
   const set = (k: keyof ClienteForm, v: string | boolean) => setForm((p) => ({ ...p, [k]: v }));
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
@@ -809,12 +814,44 @@ function ClienteModal({ open, onClose, onSave, loading }: {
           <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]">✕</button>
         </div>
         <div className="p-5 flex flex-col gap-4">
-          <div><label className="text-xs text-[var(--text-soft)] mb-1 block">Nombre completo *</label><input className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" placeholder="Ej. Juan Pérez" value={form.nombre} onChange={(e) => set("nombre", e.target.value)} /></div>
-          <div><label className="text-xs text-[var(--text-soft)] mb-1 block">Email</label><input type="email" className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" placeholder="cliente@ejemplo.com" value={form.email} onChange={(e) => set("email", e.target.value)} /></div>
-          <div><label className="text-xs text-[var(--text-soft)] mb-1 block">WhatsApp</label><input type="tel" className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" placeholder="50688888888" value={form.id_whatsapp} onChange={(e) => set("id_whatsapp", e.target.value)} /></div>
-          <div><label className="text-xs text-[var(--text-soft)] mb-1 block">Origen</label>
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">Nombre completo *</label>
+            <input className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" placeholder="Ej. Juan Pérez" value={form.nombre} onChange={(e) => set("nombre", e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">Email</label>
+            <input type="email" className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" placeholder="cliente@ejemplo.com" value={form.email} onChange={(e) => set("email", e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">País</label>
+            <CountrySelect
+              value={form.pais}
+              onChange={(code) => setForm(p => ({ ...p, pais: code, id_whatsapp: "" }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">WhatsApp</label>
+            <PhoneInput
+              key={form.pais}
+              international
+              defaultCountry={form.pais}
+              value={form.id_whatsapp}
+              onChange={(value) => setForm(p => ({ ...p, id_whatsapp: value || "" }))}
+              placeholder="Ingrese número de WhatsApp"
+              className="custom-phone-input"
+              numberInputProps={{
+                className: "flex-1 h-full bg-[var(--bg)] text-[var(--text)] text-sm focus:outline-none px-4",
+              }}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">Origen</label>
             <select className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm" value={form.origen} onChange={(e) => set("origen", e.target.value)}>
-              <option value="manual">Manual</option><option value="whatsapp">WhatsApp</option><option value="telegram">Telegram</option><option value="web">Web / Portal</option>
+              <option value="manual">Manual</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="telegram">Telegram</option>
+              <option value="portal">Web / Portal</option>
+              <option value="referido">Referido</option>
             </select>
           </div>
           <div className="flex items-center justify-between bg-[var(--bg-soft)] rounded-lg px-3 py-2">
@@ -1331,7 +1368,7 @@ function CitasOperativasPage() {
     setSaving(true);
     try {
       const nuevoId = genId();
-      const { error } = await supabase.from("clientes_negocio").insert([{ ...form, cliente_id: nuevoId, negocio_id: negocio.id, creado_en: new Date().toISOString(), actualizado_en: new Date().toISOString() }]);
+      const { error } = await supabase.from("clientes_negocio").insert([{ ...form, id_whatsapp: form.id_whatsapp?.trim() || null, cliente_id: nuevoId, negocio_id: negocio.id, creado_en: new Date().toISOString(), actualizado_en: new Date().toISOString() }]);
       if (error) throw error;
       const { data } = await supabase.from("clientes_negocio").select("cliente_id, nombre, id_whatsapp").eq("negocio_id", negocio.id);
       setClientes(data || []);

@@ -5,6 +5,9 @@ import { createClient } from "@supabase/lib/client";
 import { useNegocio } from "@/lib/hooks/useNegocio";
 import DashboardLayout from "../dashboard/layout";
 import toast from "react-hot-toast";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
+import { CountrySelect, CountryCode } from "@/components/ui/CountrySelect";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Cliente {
@@ -17,6 +20,7 @@ interface Cliente {
   portal_habilitado: boolean;
   creado_en: string;
   tiene_cita_reciente: boolean;
+  pais: string | null;
 }
 
 interface ClienteForm {
@@ -25,6 +29,7 @@ interface ClienteForm {
   id_whatsapp: string;
   origen: string;
   portal_habilitado: boolean;
+  pais: CountryCode;
 }
 
 type FiltroEstado = "todos" | "activo" | "inactivo";
@@ -35,6 +40,7 @@ const FORM_EMPTY: ClienteForm = {
   id_whatsapp: "",
   origen: "manual",
   portal_habilitado: true,
+  pais: "CR",
 };
 
 function genId() {
@@ -276,14 +282,34 @@ function ClienteModal({
             />
           </div>
 
+          {/* País */}
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">País</label>
+            <CountrySelect
+              value={form.pais}
+              onChange={(code) => {
+                setForm(p => ({ ...p, pais: code, id_whatsapp: "" }));
+              }}
+            />
+            <p className="text-xs text-[var(--text-soft)] mt-1">
+              Al cambiar el país se actualizará el código de área del teléfono
+            </p>
+          </div>
+
+          {/* WhatsApp */}
           <div>
             <label className="text-xs text-[var(--text-soft)] mb-1 block">WhatsApp</label>
-            <input
-              type="tel"
-              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
-              placeholder="50688888888"
+            <PhoneInput
+              key={form.pais}
+              international
+              defaultCountry={form.pais}
               value={form.id_whatsapp}
-              onChange={(e) => set("id_whatsapp", e.target.value)}
+              onChange={(value) => setForm(p => ({ ...p, id_whatsapp: value || "" }))}
+              placeholder="Ingrese número de WhatsApp"
+              className="custom-phone-input"
+              numberInputProps={{
+                className: "flex-1 h-full bg-[var(--bg)] text-[var(--text)] text-sm focus:outline-none px-4",
+              }}
             />
           </div>
 
@@ -500,8 +526,8 @@ function ClientesPage() {
               key={f.key}
               onClick={() => setFiltro(f.key)}
               className={`px-3 py-1.5 rounded-lg text-xs border transition ${filtro === f.key
-                  ? "text-white border-transparent"
-                  : "border-[var(--border)] text-[var(--text-soft)] hover:bg-[var(--bg-soft)]"
+                ? "text-white border-transparent"
+                : "border-[var(--border)] text-[var(--text-soft)] hover:bg-[var(--bg-soft)]"
                 }`}
               style={filtro === f.key ? { background: "var(--accent)" } : {}}
             >
@@ -560,6 +586,7 @@ function ClientesPage() {
               id_whatsapp: editando.id_whatsapp ?? undefined,
               origen: editando.origen ?? undefined,
               portal_habilitado: editando.portal_habilitado,
+              pais: (editando.pais as CountryCode) ?? "CR",
             }
             : undefined
         }
