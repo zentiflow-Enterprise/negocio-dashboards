@@ -29,7 +29,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 2,
         key: 'especialidades',
-        path: '/especialidades',
+        path: '/profesionales',
         title: 'Define especialidades',
         description: 'Categorías de servicios que ofreces',
         icon: '⭐',
