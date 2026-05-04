@@ -656,17 +656,8 @@ function ProfesionalCard({
 
 // ─── Modal Profesional CON ESPECIALIDAD ──────────────────────────────────────
 function ProfesionalModal({
-  open,
-  onClose,
-  onSave,
-  onDelete,
-  turnos,
-  especialidades,
-  inicial,
-  loading,
-  negocioTipo,
-  onCrearEspecialidad,
-
+  open, onClose, onSave, onDelete, turnos, especialidades,
+  inicial, loading, negocioTipo, onCrearEspecialidad,
 }: {
   open: boolean;
   onClose: () => void;
@@ -678,38 +669,66 @@ function ProfesionalModal({
   loading: boolean;
   negocioTipo?: string;
   onCrearEspecialidad: () => void;
-
-
 }) {
+  const supabase = createClient();
   const [form, setForm] = useState<ProfesionalForm>({ ...FORM_EMPTY, ...inicial });
-  const [servicios, setServicios] = useState<any[]>([]);
+  const [servicios, setServicios] = useState<Servicio[]>([]);
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState<string[]>([]);
+  const [loadingServicios, setLoadingServicios] = useState(false);
 
+  // Reset al abrir/cerrar
   useEffect(() => {
     setForm({ ...FORM_EMPTY, ...inicial });
+    setServiciosSeleccionados([]);
+    setServicios([]);
   }, [inicial, open]);
+
+  // Cargar servicios de la especialidad seleccionada
   useEffect(() => {
-    const loadServicios = async () => {
-      if (!form.id_especialidad) return;
-
-      const supabase = createClient();
-
-      const { data } = await supabase
-        .from("servicios")
-        .select("*")
-        .eq("id_especialidad", form.id_especialidad)
-        .eq("activo", true);
-
-      setServicios(data || []);
-    };
-
-    loadServicios();
+    if (!form.id_especialidad) { setServicios([]); return; }
+    setLoadingServicios(true);
+    supabase
+      .from("servicios")
+      .select("*")
+      .eq("id_especialidad", form.id_especialidad)
+      .eq("activo", true)
+      .then(({ data }) => { setServicios(data || []); setLoadingServicios(false); });
   }, [form.id_especialidad]);
+
+  // Cargar servicios YA asignados al profesional (solo en edición)
+  // Cargar servicios YA asignados al profesional (solo en edición)
+  useEffect(() => {
+    if (!inicial?.id_profesional || !open) {
+      return;
+    }
+
+    console.log("🔍 Cargando servicios del profesional:", inicial.id_profesional);
+
+    supabase
+      .from("profesional_servicios")
+      .select("servicio_id")
+      .eq("profesional_id", inicial.id_profesional)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("❌ Error cargando servicios:", error);
+          return;
+        }
+
+        const ids = data?.map((d) => d.servicio_id) || [];
+        console.log("✅ Servicios cargados:", ids);
+        setServiciosSeleccionados(ids);
+      });
+  }, [inicial?.id_profesional, open, supabase]);
 
   if (!open) return null;
 
   const set = (k: keyof ProfesionalForm, v: string | boolean) =>
     setForm((p) => ({ ...p, [k]: v }));
+
+  const toggleServicio = (id: string) =>
+    setServiciosSeleccionados((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
 
   return (
     <div
@@ -721,20 +740,13 @@ function ProfesionalModal({
           <h2 className="font-medium text-base">
             {inicial?.id_profesional ? "Editar profesional" : "Nuevo profesional"}
           </h2>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]"
-          >
-            ✕
-          </button>
+          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]">✕</button>
         </div>
 
         <div className="p-5 flex flex-col gap-4 overflow-y-auto flex-1">
           <div className="flex items-center gap-3">
             <Avatar nombre={form.nombre || "?"} />
-            <span className="text-sm text-[var(--text-soft)]">
-              {form.nombre || "Nombre del profesional"}
-            </span>
+            <span className="text-sm text-[var(--text-soft)]">{form.nombre || "Nombre del profesional"}</span>
           </div>
 
           <div>
@@ -747,64 +759,69 @@ function ProfesionalModal({
             />
           </div>
 
-          {/* SELECTOR DE ESPECIALIDAD */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs text-[var(--text-soft)]">Especialidad / Puesto *</label>
-              <button
-                type="button"
-                onClick={onCrearEspecialidad}
-                className="text-[10px] text-[var(--accent)] hover:underline"
-              >
+              <button type="button" onClick={onCrearEspecialidad} className="text-[10px] text-[var(--accent)] hover:underline">
                 + Crear nueva
               </button>
             </div>
             <select
               className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               value={form.id_especialidad}
-              onChange={(e) => set("id_especialidad", e.target.value)}
+              onChange={(e) => {
+                set("id_especialidad", e.target.value);
+                setServiciosSeleccionados([]); // reset al cambiar especialidad
+              }}
             >
               <option value="">Seleccionar especialidad...</option>
               {especialidades.map((esp) => (
-                <option key={esp.id_especialidad} value={esp.id_especialidad}>
-                  {esp.nombre}
-                </option>
+                <option key={esp.id_especialidad} value={esp.id_especialidad}>{esp.nombre}</option>
               ))}
             </select>
             <p className="text-[10px] text-[var(--text-soft)] mt-1">
               Define el rol o puesto del profesional (ej: Barbero, Nutricionista, Estilista)
             </p>
           </div>
-          {/* SERVICIOS SEGÚN ESPECIALIDAD */}
+
+          {/* Servicios de la especialidad */}
           {form.id_especialidad && (
             <div>
               <label className="text-xs text-[var(--text-soft)] mb-2 block">
                 Servicios que puede realizar
               </label>
-
-              <div className="flex flex-col gap-2 max-h-40 overflow-y-auto border border-[var(--border)] rounded-lg p-2">
-                {servicios.map((s) => (
-                  <label
-                    key={s.id_servicio}
-                    className="flex items-center gap-2 text-sm cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={serviciosSeleccionados.includes(s.id_servicio)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setServiciosSeleccionados((prev) => [...prev, s.id_servicio]);
-                        } else {
-                          setServiciosSeleccionados((prev) =>
-                            prev.filter((id) => id !== s.id_servicio)
-                          );
-                        }
-                      }}
-                    />
-                    {s.nombre}
-                  </label>
-                ))}
-              </div>
+              {loadingServicios ? (
+                <p className="text-xs text-[var(--text-soft)] py-2">Cargando servicios...</p>
+              ) : servicios.length === 0 ? (
+                <p className="text-xs text-[var(--text-soft)] py-2">
+                  No hay servicios asociados a esta especialidad
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2 max-h-40 overflow-y-auto border border-[var(--border)] rounded-lg p-2">
+                  {servicios.map((s) => {
+                    const checked = serviciosSeleccionados.includes(s.id_servicio);
+                    return (
+                      <label key={s.id_servicio} className="flex items-center gap-2.5 text-sm cursor-pointer px-1 py-0.5 rounded hover:bg-[var(--bg-soft)] transition">
+                        <div
+                          onClick={() => toggleServicio(s.id_servicio)}
+                          className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer ${checked
+                            ? "border-[var(--accent)] bg-[var(--accent)]"
+                            : "border-[var(--border)] bg-[var(--bg-soft)]"
+                            }`}
+                        >
+                          {checked && (
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </div>
+                        <span onClick={() => toggleServicio(s.id_servicio)} className="flex-1">{s.nombre}</span>
+                        <span className="text-[10px] text-[var(--text-soft)]">{s.duracion_min} min</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -852,34 +869,29 @@ function ProfesionalModal({
             <button
               type="button"
               onClick={() => set("activo", !form.activo)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"
-                }`}
+              className={`relative w-11 h-6 rounded-full transition-colors ${form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}
             >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.activo ? "translate-x-5" : "translate-x-0"
-                  }`}
-              />
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.activo ? "translate-x-5" : "translate-x-0"}`} />
             </button>
           </div>
         </div>
 
         <div className="flex gap-2 p-5 border-t border-[var(--border)] flex-shrink-0">
           {inicial?.id_profesional && onDelete && (
-            <button
-              onClick={() => onDelete(inicial.id_profesional!)}
-              className="py-2 px-3 rounded-lg border border-red-400/30 text-sm text-red-500 hover:bg-red-500/10 flex-1 transition"
-            >
+            <button onClick={() => onDelete(inicial.id_profesional!)} className="py-2 px-3 rounded-lg border border-red-400/30 text-sm text-red-500 hover:bg-red-500/10 flex-1 transition">
               Eliminar
             </button>
           )}
-          <button
-            onClick={onClose}
-            className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--bg-soft)] transition"
-          >
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--bg-soft)] transition">
             Cancelar
           </button>
           <button
-            onClick={() => onSave(form, inicial?.id_profesional, serviciosSeleccionados)}
+            onClick={() => {
+              console.log("🎯 Guardando con servicios:", serviciosSeleccionados);
+              console.log("📋 Formulario:", form);
+              console.log("🆔 ID profesional:", inicial?.id_profesional);
+              onSave(form, inicial?.id_profesional, serviciosSeleccionados);
+            }}
             disabled={loading || !form.nombre.trim() || !form.id_especialidad}
             className="flex-1 py-2 rounded-lg text-sm font-medium text-white transition disabled:opacity-40"
             style={{ background: "var(--accent)" }}
@@ -1086,12 +1098,6 @@ function EspecialidadesModal({
 
 // ─── Página principal MEJORADA ────────────────────────────────────────────────
 function ProfesionalesPage() {
-
-
-  const [servicios, setServicios] = useState<Servicio[]>([]);
-  const [serviciosSeleccionados, setServiciosSeleccionados] = useState<string[]>([]);
-
-
   const supabase = createClient();
   const { negocio } = useNegocio();
 
@@ -1100,24 +1106,16 @@ function ProfesionalesPage() {
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-
   const [ausenciasVigentes, setAusenciasVigentes] = useState<Record<string, number>>({});
-
   const [busqueda, setBusqueda] = useState("");
   const [filtroActivo, setFiltroActivo] = useState<"todos" | "activo" | "inactivo">("todos");
   const [filtroEspecialidad, setFiltroEspecialidad] = useState<string>("todas");
-
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState<Profesional | null>(null);
-
-
   const [ausenciasModal, setAusenciasModal] = useState<Profesional | null>(null);
   const [especialidadesModalOpen, setEspecialidadesModalOpen] = useState(false);
 
-  useEffect(() => {
-    console.log("SERVICIOS CARGADOS:", servicios);
-  }, [servicios]);
+
 
   const loadProfesionales = useCallback(async () => {
     if (!negocio?.id) return;
@@ -1131,26 +1129,7 @@ function ProfesionalesPage() {
     setLoading(false);
   }, [negocio?.id]);
 
-  const loadServicios = async () => {
-    if (!negocio?.id) return;
 
-    const { data } = await supabase
-      .from("servicios")
-      .select("*")
-      .eq("negocio_id", negocio.id)
-      .order("nombre");
-
-    setServicios(data || []);
-  };
-
-  const loadServiciosProfesional = async (profId: string) => {
-    const { data } = await supabase
-      .from("profesional_servicios")
-      .select("servicio_id")
-      .eq("profesional_id", profId);
-
-    setServiciosSeleccionados(data?.map((d) => d.servicio_id) || []);
-  };
 
   const loadEspecialidades = useCallback(async () => {
     const { data } = await supabase
@@ -1176,21 +1155,12 @@ function ProfesionalesPage() {
     setAusenciasVigentes(counts);
   }, [negocio?.id]);
 
-  useEffect(() => {
-    if (!editando?.id_profesional) return;
 
-    const load = async () => {
-      await loadServiciosProfesional(editando.id_profesional);
-    };
-
-    load();
-  }, [editando]);
 
   useEffect(() => {
     if (!negocio?.id) return;
     loadProfesionales();
     loadEspecialidades();
-    loadServicios();
     loadAusenciasVigentes();
     supabase
       .from("turnos")
@@ -1200,23 +1170,37 @@ function ProfesionalesPage() {
       .then(({ data }) => setTurnos((data as Turno[]) || []));
   }, [negocio?.id, loadProfesionales, loadEspecialidades, loadAusenciasVigentes]);
 
-  const handleSave = async (form: ProfesionalForm, id?: string, serviciosIds: string[] = []) => {
+  const handleSave = async (
+    form: ProfesionalForm,
+    id?: string,
+    serviciosIds: string[] = []
+  ) => {
     if (!negocio?.id) return;
+
+    console.log("🎯 Iniciando guardado...", { form, id, serviciosIds });
 
     setSaving(true);
 
     try {
       let profesionalId = id;
 
+      // 1️⃣ CREAR O ACTUALIZAR PROFESIONAL
       if (id) {
-        await supabase
+        const { error } = await supabase
           .from("profesionales")
           .update({ ...form })
           .eq("id_profesional", id);
-      } else {
-        const nuevoId = "PROF_" + Date.now().toString(36);
 
-        await supabase.from("profesionales").insert([
+        if (error) throw error;
+
+        console.log("✅ Profesional actualizado:", id);
+      } else {
+        const nuevoId =
+          "PROF_" +
+          Date.now().toString(36) +
+          Math.random().toString(36).slice(2, 6);
+
+        const { error } = await supabase.from("profesionales").insert([
           {
             ...form,
             id_profesional: nuevoId,
@@ -1224,34 +1208,99 @@ function ProfesionalesPage() {
           },
         ]);
 
+        if (error) throw error;
+
         profesionalId = nuevoId;
+        console.log("✅ Profesional creado:", nuevoId);
       }
 
-      // 🧠 BORRAR RELACIONES ANTERIORES
-      await supabase
+      // 2️⃣ VALIDAR ID
+      if (!profesionalId) {
+        throw new Error("No se pudo obtener el ID del profesional");
+      }
+
+      console.log("🔄 Sincronizando servicios...");
+      console.log("📋 Nuevos servicios:", serviciosIds);
+
+      // ================================
+      // 3️⃣ SINCRONIZACIÓN INTELIGENTE
+      // ================================
+
+      // 🔹 Obtener actuales desde DB
+      const { data: actuales, error: fetchError } = await supabase
         .from("profesional_servicios")
-        .delete()
+        .select("servicio_id")
         .eq("profesional_id", profesionalId);
 
-      // 🚀 INSERTAR NUEVAS
-      if (serviciosIds.length > 0) {
-        const inserts = serviciosIds.map((servicioId) => ({
+      if (fetchError) throw fetchError;
+
+      const actualesIds = actuales?.map((s) => s.servicio_id) || [];
+
+      console.log("📦 Actuales en DB:", actualesIds);
+
+      // 🔹 Calcular diferencias
+      const toInsert = serviciosIds.filter((id) => !actualesIds.includes(id));
+      const toDelete = actualesIds.filter((id) => !serviciosIds.includes(id));
+
+      console.log("➕ Insertar:", toInsert);
+      console.log("➖ Eliminar:", toDelete);
+
+      // 🔹 INSERTAR SOLO NUEVOS
+      if (toInsert.length > 0) {
+        const inserts = toInsert.map((servicioId) => ({
           profesional_id: profesionalId,
           servicio_id: servicioId,
         }));
 
-        await supabase.from("profesional_servicios").insert(inserts);
+        const { error: insertError } = await supabase
+          .from("profesional_servicios")
+          .insert(inserts);
+
+        if (insertError) throw insertError;
+
+        console.log("✅ Servicios insertados:", toInsert.length);
       }
 
-      toast.success("Profesional guardado ✅");
+      // 🔹 ELIMINAR SOLO LOS QUITADOS
+      if (toDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("profesional_servicios")
+          .delete()
+          .eq("profesional_id", profesionalId)
+          .in("servicio_id", toDelete);
+
+        if (deleteError) throw deleteError;
+
+        console.log("🗑️ Servicios eliminados:", toDelete.length);
+      }
+
+      // 🔹 Caso especial: sin servicios
+      if (serviciosIds.length === 0 && actualesIds.length > 0) {
+        console.log("⚠️ Quitando todos los servicios");
+
+        const { error } = await supabase
+          .from("profesional_servicios")
+          .delete()
+          .eq("profesional_id", profesionalId);
+
+        if (error) throw error;
+      }
+
+      // ================================
+      // FIN
+      // ================================
+
+      toast.success(
+        `Profesional guardado con ${serviciosIds.length} servicio(s) ✅`
+      );
 
       setModalOpen(false);
       setEditando(null);
       loadProfesionales();
 
     } catch (err) {
-      console.error(err);
-      toast.error("Error guardando ❌");
+      console.error("💥 Error completo:", err);
+      toast.error("Error guardando profesional ❌");
     } finally {
       setSaving(false);
     }
@@ -1392,7 +1441,7 @@ function ProfesionalesPage() {
                 setEditando(p);
                 setModalOpen(true);
 
-                loadServiciosProfesional(p.id_profesional);
+
               }}
               onAusencias={(p) => setAusenciasModal(p)}
               ausenciasCount={ausenciasVigentes[p.id_profesional] || 0}

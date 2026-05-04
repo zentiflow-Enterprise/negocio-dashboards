@@ -230,7 +230,16 @@ function ClienteModal({
   const [form, setForm] = useState<ClienteForm>({ ...FORM_EMPTY, ...inicial });
 
   useEffect(() => {
-    setForm({ ...FORM_EMPTY, ...inicial });
+    setForm({
+      ...FORM_EMPTY,
+      ...inicial,
+      nombre: inicial?.nombre ?? "",
+      email: inicial?.email ?? "",
+      id_whatsapp: inicial?.id_whatsapp ?? "",
+      origen: inicial?.origen ?? "manual",
+      portal_habilitado: inicial?.portal_habilitado ?? true,
+      pais: inicial?.pais ?? "CR",
+    });
   }, [inicial, open]);
 
   if (!open) return null;
@@ -584,9 +593,9 @@ function ClientesPage() {
             ? {
               cliente_id: editando.cliente_id,
               nombre: editando.nombre,
-              email: editando.email,
-              id_whatsapp: editando.id_whatsapp ?? undefined,
-              origen: editando.origen ?? undefined,
+              email: editando.email ?? "",
+              id_whatsapp: editando.id_whatsapp ?? "",
+              origen: editando.origen ?? "manual",
               portal_habilitado: editando.portal_habilitado,
               pais: (editando.pais as CountryCode) ?? "CR",
             }
