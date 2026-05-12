@@ -180,12 +180,7 @@ function ClienteCard({
           </p>
         </div>
 
-        <div>
-          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">WhatsApp</p>
-          <p className={`text-xs font-mono ${cliente.id_whatsapp ? "" : "text-[var(--text-soft)]"}`}>
-            {cliente.id_whatsapp || "—"}
-          </p>
-        </div>
+
         {/* 👆 POR ESTE */}
         <div>
           <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">WhatsApp</p>
