@@ -1,7 +1,7 @@
 {
-    "name": "supabase",
-    "version": "0.0.0",
-    "private": true,
-    "main": "lib/client.ts",
-    "types": "lib/client.ts"
+  "name": "@repo/supabase",
+  "version": "0.0.0",
+  "private": true,
+  "main": "lib/client.ts",
+  "types": "lib/client.ts"
 }

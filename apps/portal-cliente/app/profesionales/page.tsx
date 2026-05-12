@@ -5,6 +5,7 @@ import { createClient } from "@supabase/lib/client";
 import { useNegocio } from "@/lib/hooks/useNegocio";
 import DashboardLayout from "../dashboard/layout";
 import toast from "react-hot-toast";
+import { COUNTRIES, Flag } from "@/components/ui/CountrySelect";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Profesional {
@@ -150,6 +151,13 @@ function IconBriefcase({ className = "w-4 h-4" }: { className?: string }) {
       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
     </svg>
   );
+}
+
+function phoneDisplay(phone: string | null): { flag: string; local: string } | null {
+  if (!phone) return null;
+  const match = COUNTRIES.find((c) => phone.startsWith(c.dial));
+  if (!match) return { flag: "cr", local: phone };
+  return { flag: match.flag, local: phone.slice(match.dial.length).trim() };
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -626,7 +634,16 @@ function ProfesionalCard({
       <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
         <div>
           <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide">Teléfono</p>
-          <p className="font-mono text-[var(--text-soft)]">{profesional.telefono || "—"}</p>
+          {(() => {
+            const p = phoneDisplay(profesional.telefono);
+            if (!p) return <p className="font-mono text-[var(--text-soft)]">—</p>;
+            return (
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Flag code={p.flag} size={16} />
+                <span className="text-xs font-mono">{p.local}</span>
+              </div>
+            );
+          })()}
         </div>
         <div>
           <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide">Turno</p>
