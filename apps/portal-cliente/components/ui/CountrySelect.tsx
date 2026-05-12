@@ -3,15 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 
 export const COUNTRIES = [
-    { code: "CR", name: "Costa Rica", flag: "cr" },
-    { code: "MX", name: "México", flag: "mx" },
-    { code: "CO", name: "Colombia", flag: "co" },
-    { code: "PA", name: "Panamá", flag: "pa" },
-    { code: "NI", name: "Nicaragua", flag: "ni" },
-    { code: "GT", name: "Guatemala", flag: "gt" },
-    { code: "SV", name: "El Salvador", flag: "sv" },
-    { code: "HN", name: "Honduras", flag: "hn" },
-    { code: "CA", name: "Canadá", flag: "ca" },
+    { code: "CR", name: "Costa Rica", flag: "cr", dial: "+506" },
+    { code: "MX", name: "México", flag: "mx", dial: "+52" },
+    { code: "CO", name: "Colombia", flag: "co", dial: "+57" },
+    { code: "PA", name: "Panamá", flag: "pa", dial: "+507" },
+    { code: "NI", name: "Nicaragua", flag: "ni", dial: "+505" },
+    { code: "GT", name: "Guatemala", flag: "gt", dial: "+502" },
+    { code: "SV", name: "El Salvador", flag: "sv", dial: "+503" },
+    { code: "HN", name: "Honduras", flag: "hn", dial: "+504" },
+    { code: "CA", name: "Canadá", flag: "ca", dial: "+1" },
 ] as const;
 
 export type CountryCode = typeof COUNTRIES[number]["code"];

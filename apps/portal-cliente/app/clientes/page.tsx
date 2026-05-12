@@ -9,6 +9,7 @@ import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { CountrySelect, CountryCode } from "@/components/ui/CountrySelect";
 import { SimpleSelect } from "@/components/ui/SimpleSelect";
+import { COUNTRIES, Flag } from "@/components/ui/CountrySelect";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Cliente {
@@ -65,6 +66,16 @@ function fmtDate(d: string | null) {
     month: "short",
     year: "numeric",
   });
+}
+
+function phoneDisplay(phone: string | null): { countryFlag: string; local: string } | null {
+  if (!phone) return null;
+  const match = COUNTRIES.find((c) => phone.startsWith(c.dial));
+  if (!match) return { countryFlag: "cr", local: phone }; // fallback
+  return {
+    countryFlag: match.flag,
+    local: phone.slice(match.dial.length).trim(),
+  };
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -174,6 +185,20 @@ function ClienteCard({
           <p className={`text-xs font-mono ${cliente.id_whatsapp ? "" : "text-[var(--text-soft)]"}`}>
             {cliente.id_whatsapp || "—"}
           </p>
+        </div>
+        {/* 👆 POR ESTE */}
+        <div>
+          <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">WhatsApp</p>
+          {(() => {
+            const p = phoneDisplay(cliente.id_whatsapp);
+            if (!p) return <p className="text-xs text-[var(--text-soft)]">—</p>;
+            return (
+              <div className="flex items-center gap-1.5">
+                <Flag code={p.countryFlag} size={18} />
+                <span className="text-xs font-mono">{p.local}</span>
+              </div>
+            );
+          })()}
         </div>
 
         <div>
