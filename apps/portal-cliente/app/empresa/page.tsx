@@ -6,6 +6,7 @@ import { useNegocio } from "@/lib/hooks/useNegocio";
 import toast from "react-hot-toast";
 import DashboardLayout from "../dashboard/layout";
 import { setNegocioGlobal } from "@/lib/hooks/useNegocio";
+import type { PostgrestError } from '@supabase/supabase-js';
 
 const MONEDAS = [
     { value: "₡", label: "₡ Colón (CRC)" },
@@ -187,27 +188,62 @@ function EmpresaPage() {
 
     const saveHorarios = async () => {
         if (!negocio?.id) return toast.error("No se encontró el negocio");
+
+        if (activeDays.length === 0) {
+            return toast.error("Selecciona al menos un día");
+        }
+
         setSaving(true);
         try {
-            const rows = activeDays.map(dia => ({
+            const rows = DIAS.map(dia => ({
                 negocio_id: negocio.id,
-                dia_semana: DIA_INDEX[dia],
-                hora_inicio: horarios[dia]?.inicio || "08:00",
-                hora_fin: horarios[dia]?.fin || "18:00",
+                dia_semana: DIA_INDEX[dia.key],
+                hora_inicio: horarios[dia.key]?.inicio || "08:00",
+                hora_fin: horarios[dia.key]?.fin || "18:00",
                 intervalo_min: form.neg_intervalo_min || 30,
-                activo: true
+                activo: activeDays.includes(dia.key)
             }));
 
-            const { error } = await supabase
+            console.log("📤 Datos a guardar:", rows);
+
+            const { data, error } = await supabase
                 .from("config_negocio_horario")
                 .upsert(rows, { onConflict: "negocio_id,dia_semana" });
 
-            if (error) throw error;
+            if (error) {
+                console.error("❌ Error de Supabase:", {
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code
+                });
+                throw error;
+            }
+
+            console.log("✅ Guardado exitoso:", data);
             window.dispatchEvent(new Event('onboarding-refresh'));
             toast.success("Horario guardado");
+
         } catch (err) {
-            console.error(err);
-            toast.error("❌ Error al guardar horario");
+            console.error("❌ Error completo:", err);
+
+            // ✅ Type guard para PostgrestError
+            const isPostgrestError = (error: unknown): error is PostgrestError => {
+                return typeof error === 'object' && error !== null && 'code' in error;
+            };
+
+            if (isPostgrestError(err)) {
+                // Ahora TypeScript sabe que err tiene code, message, etc.
+                if (err.code === '23505') {
+                    toast.error("Error: Registro duplicado");
+                } else if (err.code === '42501') {
+                    toast.error("Error: Sin permisos para guardar");
+                } else {
+                    toast.error(`Error: ${err.message}`);
+                }
+            } else {
+                toast.error("Error inesperado al guardar");
+            }
         } finally {
             setSaving(false);
         }
@@ -385,7 +421,6 @@ function EmpresaPage() {
                     </div>
                 </div>
             </div>
-
             {/* 4. Horario y operaciones */}
             <div id="horarios" className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-6">
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[var(--border)]">
@@ -414,7 +449,10 @@ function EmpresaPage() {
                                 value={horarios[dia.key]?.inicio || "08:00"}
                                 onChange={(e) => setHorarios(prev => ({
                                     ...prev,
-                                    [dia.key]: { inicio: prev[dia.key]?.inicio || "08:00", fin: e.target.value }
+                                    [dia.key]: {
+                                        inicio: e.target.value,
+                                        fin: prev[dia.key]?.fin ?? "18:00"
+                                    }
                                 }))}
                             />
                             <span className="text-[var(--text-soft)]">a</span>
@@ -424,7 +462,10 @@ function EmpresaPage() {
                                 value={horarios[dia.key]?.fin || "18:00"}
                                 onChange={(e) => setHorarios(prev => ({
                                     ...prev,
-                                    [dia.key]: { inicio: e.target.value, fin: prev[dia.key]?.fin || "18:00" }
+                                    [dia.key]: {
+                                        inicio: prev[dia.key]?.inicio ?? "08:00",
+                                        fin: e.target.value
+                                    }
                                 }))}
                             />
                         </div>
