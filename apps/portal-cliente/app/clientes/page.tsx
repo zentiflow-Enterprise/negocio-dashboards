@@ -68,14 +68,21 @@ function fmtDate(d: string | null) {
   });
 }
 
-function phoneDisplay(phone: string | null): { countryFlag: string; local: string } | null {
+function phoneDisplay(phone: string | null): { flag: string; local: string } | null {
   if (!phone) return null;
   const match = COUNTRIES.find((c) => phone.startsWith(c.dial));
-  if (!match) return { countryFlag: "cr", local: phone }; // fallback
+  if (!match) return { flag: "cr", local: phone };
   return {
-    countryFlag: match.flag,
+    flag: match.flag,
     local: phone.slice(match.dial.length).trim(),
   };
+}
+
+function toE164(phone: string): string {
+  if (!phone) return "";
+  const clean = phone.replace(/\s/g, "");
+  if (clean.startsWith("+")) return clean;
+  return "+" + clean;
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -181,7 +188,7 @@ function ClienteCard({
         </div>
 
 
-        {/* 👆 POR ESTE */}
+
         <div>
           <p className="text-[10px] text-[var(--text-soft)] uppercase tracking-wide mb-0.5">WhatsApp</p>
           {(() => {
@@ -189,7 +196,7 @@ function ClienteCard({
             if (!p) return <p className="text-xs text-[var(--text-soft)]">—</p>;
             return (
               <div className="flex items-center gap-1.5">
-                <Flag code={p.countryFlag} size={18} />
+                <Flag code={p.flag} size={18} />
                 <span className="text-xs font-mono">{p.local}</span>
               </div>
             );
@@ -461,8 +468,48 @@ function ClientesPage() {
     if (!negocio?.id) return;
     setSaving(true);
     try {
-      const payload = {
+      // Normalizar teléfono a E.164
+      const formNormalizado = {
         ...form,
+        id_whatsapp: form.id_whatsapp ? toE164(form.id_whatsapp) : "",
+      };
+
+      // Validar WhatsApp duplicado
+      if (formNormalizado.id_whatsapp) {
+        const { data: waExiste } = await supabase
+          .from("clientes_negocio")
+          .select("cliente_id, nombre")
+          .eq("negocio_id", negocio.id)
+          .eq("id_whatsapp", formNormalizado.id_whatsapp)
+          .neq("cliente_id", id ?? "")
+          .maybeSingle();
+
+        if (waExiste) {
+          toast.error(`WhatsApp ya está registrado por ${waExiste.nombre}`);
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Validar email duplicado
+      if (formNormalizado.email) {
+        const { data: emailExiste } = await supabase
+          .from("clientes_negocio")
+          .select("cliente_id, nombre")
+          .eq("negocio_id", negocio.id)
+          .eq("email", formNormalizado.email)
+          .neq("cliente_id", id ?? "")
+          .maybeSingle();
+
+        if (emailExiste) {
+          toast.error(`Email ya está registrado por ${emailExiste.nombre}`);
+          setSaving(false);
+          return;
+        }
+      }
+
+      const payload = {
+        ...formNormalizado,
         negocio_id: negocio.id,
         actualizado_en: new Date().toISOString(),
       };
@@ -480,9 +527,19 @@ function ClientesPage() {
       setModalOpen(false);
       setEditando(null);
       loadClientes();
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.code === "23505") {
+        if (e.message.includes("whatsapp")) {
+          toast.error("Este WhatsApp ya está registrado en otro cliente");
+        } else if (e.message.includes("email")) {
+          toast.error("Este email ya está registrado en otro cliente");
+        } else {
+          toast.error("Dato duplicado");
+        }
+      } else {
+        toast.error("Error al guardar ❌");
+      }
       console.error(e);
-      toast.error("Error al guardar ❌");
     } finally {
       setSaving(false);
     }

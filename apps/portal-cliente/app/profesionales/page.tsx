@@ -288,10 +288,14 @@ function AusenciasModal({
           id_profesional: profesional.id_profesional,
           fecha_inicio: form.todo_el_dia
             ? form.fecha_inicio + "T00:00:00"
-            : form.fecha_inicio,
+            : form.fecha_inicio.length === 16
+              ? form.fecha_inicio + ":00"
+              : form.fecha_inicio,
           fecha_fin: form.todo_el_dia
             ? form.fecha_fin + "T23:59:59"
-            : form.fecha_fin,
+            : form.fecha_fin.length === 16
+              ? form.fecha_fin + ":00"
+              : form.fecha_fin,
           todo_el_dia: form.todo_el_dia,
           motivo: motivoFinal,
         },
@@ -921,6 +925,185 @@ function ProfesionalModal({
   );
 }
 
+// Agregar este tipo después de la interfaz Servicio
+interface ServicioForm {
+  nombre: string;
+  duracion_min: number;
+  precio: number;
+  descripcion: string;
+  color_hex: string;
+  activo: boolean;
+}
+
+// Agregar este componente antes de EspecialidadesModal
+function ServicioModal({
+  open,
+  onClose,
+  onSave,
+  onDelete,
+  inicial,
+  loading,
+  especialidades,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (form: ServicioForm, id?: string) => void;
+  onDelete?: (id: string) => void;
+  inicial?: Servicio;
+  loading: boolean;
+  especialidades: Especialidad[];
+}) {
+  const FORM_EMPTY: ServicioForm = {
+    nombre: "",
+    duracion_min: 30,
+    precio: 0,
+    descripcion: "",
+    color_hex: "#6366f1",
+    activo: true,
+  };
+
+  const [form, setForm] = useState<ServicioForm>({ ...FORM_EMPTY, ...inicial });
+
+  useEffect(() => {
+    setForm({ ...FORM_EMPTY, ...inicial });
+  }, [inicial, open]);
+
+  if (!open) return null;
+
+  const set = (k: keyof ServicioForm, v: string | number | boolean) =>
+    setForm((p) => ({ ...p, [k]: v }));
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border)] flex-shrink-0">
+          <h2 className="font-medium text-base">
+            {inicial?.id_servicio ? "Editar servicio" : "Nuevo servicio"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-5 flex flex-col gap-4 overflow-y-auto flex-1">
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">Nombre del servicio *</label>
+            <input
+              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              placeholder="Ej. Corte de cabello"
+              value={form.nombre}
+              onChange={(e) => set("nombre", e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-[var(--text-soft)] mb-1 block">Duración (min) *</label>
+              <input
+                type="number"
+                min="5"
+                step="5"
+                className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+                value={form.duracion_min}
+                onChange={(e) => set("duracion_min", Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-[var(--text-soft)] mb-1 block">Precio (₡) *</label>
+              <input
+                type="number"
+                min="0"
+                step="100"
+                className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+                value={form.precio}
+                onChange={(e) => set("precio", Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-1 block">Descripción</label>
+            <textarea
+              className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] resize-none"
+              placeholder="Descripción del servicio..."
+              rows={3}
+              value={form.descripcion}
+              onChange={(e) => set("descripcion", e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-[var(--text-soft)] mb-2 block">Color identificador</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                className="w-12 h-12 rounded-lg border border-[var(--border)] cursor-pointer"
+                value={form.color_hex}
+                onChange={(e) => set("color_hex", e.target.value)}
+              />
+              <input
+                type="text"
+                className="flex-1 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[var(--accent)]"
+                value={form.color_hex}
+                onChange={(e) => set("color_hex", e.target.value)}
+                placeholder="#6366f1"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between bg-[var(--bg-soft)] rounded-lg px-3 py-2">
+            <span className="text-sm">Servicio activo</span>
+            <button
+              type="button"
+              onClick={() => set("activo", !form.activo)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${form.activo ? "bg-[var(--accent)]" : "bg-[var(--border)]"
+                }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.activo ? "translate-x-5" : "translate-x-0"
+                  }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-2 p-5 border-t border-[var(--border)] flex-shrink-0">
+          {inicial?.id_servicio && onDelete && (
+            <button
+              onClick={() => onDelete(inicial.id_servicio)}
+              className="py-2 px-3 rounded-lg border border-red-400/30 text-sm text-red-500 hover:bg-red-500/10 flex-1 transition"
+            >
+              Eliminar
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--bg-soft)] transition"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onSave(form, inicial?.id_servicio)}
+            disabled={loading || !form.nombre.trim() || form.duracion_min <= 0}
+            className="flex-1 py-2 rounded-lg text-sm font-medium text-white transition disabled:opacity-40"
+            style={{ background: "var(--accent)" }}
+          >
+            {loading ? "Guardando..." : "Guardar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
 // ─── Modal Gestión de Especialidades ─────────────────────────────────────────
 function EspecialidadesModal({
   open,
@@ -940,35 +1123,93 @@ function EspecialidadesModal({
   const supabase = createClient();
   const [nuevaEsp, setNuevaEsp] = useState("");
   const [saving, setSaving] = useState(false);
+  // ── NUEVO: tab seleccionado y servicios ──────────────────
+  const [tabActivo, setTabActivo] = useState<string | null>(null);
+  const [serviciosEsp, setServiciosEsp] = useState<Servicio[]>([]);
+  const [loadingServ, setLoadingServ] = useState(false);
+  const [servicioModalOpen, setServicioModalOpen] = useState(false);
+  const [editandoServicio, setEditandoServicio] = useState<Servicio | null>(null);
+  const [savingServ, setSavingServ] = useState(false);
 
-  const predefinidas = negocioTipo ? ESPECIALIDADES_PREDEFINIDAS[negocioTipo] || [] : [];
+  // Cargar servicios cuando cambia la tab
+  useEffect(() => {
+    if (!tabActivo) { setServiciosEsp([]); return; }
+    setLoadingServ(true);
+    supabase
+      .from("servicios")
+      .select("*")
+      .eq("id_especialidad", tabActivo)
+      .eq("negocio_id", negocioId)
+      .order("nombre")
+      .then(({ data }) => {
+        setServiciosEsp((data as Servicio[]) || []);
+        setLoadingServ(false);
+      });
+  }, [tabActivo, negocioId]);
+
+  const handleCrearServicio = async (form: ServicioForm, id?: string) => {
+    setSavingServ(true);
+    try {
+      if (id) {
+        await supabase.from("servicios").update({ ...form }).eq("id_servicio", id);
+        toast.success("Servicio actualizado ✅");
+      } else {
+        const nuevoId = "srv_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        await supabase.from("servicios").insert([{
+          ...form,
+          id_servicio: nuevoId,
+          negocio_id: negocioId,
+          id_especialidad: tabActivo,
+        }]);
+        toast.success("Servicio creado ✅");
+      }
+      setServicioModalOpen(false);
+      setEditandoServicio(null);
+      // recargar servicios de esta especialidad
+      const { data } = await supabase
+        .from("servicios").select("*")
+        .eq("id_especialidad", tabActivo!)
+        .eq("negocio_id", negocioId).order("nombre");
+      setServiciosEsp((data as Servicio[]) || []);
+    } catch {
+      toast.error("Error guardando servicio ❌");
+    } finally {
+      setSavingServ(false);
+    }
+  };
+
+  const handleEliminarServicio = async (id: string) => {
+    if (!confirm("¿Eliminar este servicio?")) return;
+    await supabase.from("servicios").delete().eq("id_servicio", id);
+    toast.success("Servicio eliminado ✅");
+    setServicioModalOpen(false);
+    setEditandoServicio(null);
+    const { data } = await supabase
+      .from("servicios").select("*")
+      .eq("id_especialidad", tabActivo!)
+      .eq("negocio_id", negocioId).order("nombre");
+    setServiciosEsp((data as Servicio[]) || []);
+  };
 
   const handleCrear = async () => {
-    if (!nuevaEsp.trim()) {
-      toast.error("Ingresá el nombre de la especialidad");
-      return;
-    }
-
+    if (!nuevaEsp.trim()) { toast.error("Ingresá el nombre de la especialidad"); return; }
     setSaving(true);
     try {
-      const { error } = await supabase.from("especialidades").insert([
-        {
-          id_especialidad: genId("esp"),
-          negocio_id: negocioId,
-          nombre: nuevaEsp.trim(),
-          sector: negocioTipo || "general",
-          activo: true,
-        },
-      ]);
+      const { data, error } = await supabase.from("especialidades").insert([{
+        id_especialidad: genId("esp"),
+        negocio_id: negocioId,
+        nombre: nuevaEsp.trim(),
+        sector: negocioTipo || "general",
+        activo: true,
+      }]).select().single();
       if (error) throw error;
       toast.success("Especialidad creada ✅");
       setNuevaEsp("");
       onReload();
-    } catch {
-      toast.error("Error creando especialidad ❌");
-    } finally {
-      setSaving(false);
-    }
+      // Seleccionar la nueva especialidad automáticamente
+      if (data) setTabActivo(data.id_especialidad);
+    } catch { toast.error("Error creando especialidad ❌"); }
+    finally { setSaving(false); }
   };
 
   const handleEliminar = async (id: string) => {
@@ -976,140 +1217,224 @@ function EspecialidadesModal({
     try {
       await supabase.from("especialidades").delete().eq("id_especialidad", id);
       toast.success("Especialidad eliminada ✅");
+      if (tabActivo === id) setTabActivo(null);
       onReload();
-    } catch {
-      toast.error("Error eliminando ❌");
-    }
+    } catch { toast.error("Error eliminando ❌"); }
   };
 
   const handleCrearPredefinida = async (nombre: string) => {
     setSaving(true);
     try {
-      const { error } = await supabase.from("especialidades").insert([
-        {
-          id_especialidad: genId("esp"),
-          nombre,
-          sector: negocioTipo || "general",
-          activo: true,
-          negocio_id: negocioId,
-        },
-      ]);
+      const { data, error } = await supabase.from("especialidades").insert([{
+        id_especialidad: genId("esp"),
+        nombre,
+        sector: negocioTipo || "general",
+        activo: true,
+        negocio_id: negocioId,
+      }]).select().single();
       if (error) throw error;
       toast.success(`"${nombre}" agregada ✅`);
       onReload();
+      if (data) setTabActivo(data.id_especialidad);
     } catch (err) {
       console.error("ERROR CREANDO ESPECIALIDAD:", err);
       toast.error("Error creando especialidad ❌");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   if (!open) return null;
 
   const existentes = especialidades.map((e) => e.nombre.toLowerCase());
+  const predefinidas = negocioTipo ? ESPECIALIDADES_PREDEFINIDAS[negocioTipo] || [] : [];
   const predisponibles = predefinidas.filter((p) => !existentes.includes(p.toLowerCase()));
+  const espActiva = especialidades.find(e => e.id_especialidad === tabActivo);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between p-5 border-b border-[var(--border)] flex-shrink-0">
-          <div>
-            <h2 className="font-medium text-base">Gestionar especialidades</h2>
-            <p className="text-[11px] text-[var(--text-soft)] mt-0.5">
-              Define los roles o puestos de tus profesionales
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-5 border-b border-[var(--border)] flex-shrink-0 flex flex-col gap-3">
-          <p className="text-xs font-medium text-[var(--text-soft)] uppercase tracking-wide">
-            Crear nueva especialidad
-          </p>
-          <div className="flex gap-2">
-            <input
-              className="flex-1 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
-              placeholder="Ej: Barbero Senior, Nutricionista Deportivo..."
-              value={nuevaEsp}
-              onChange={(e) => setNuevaEsp(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCrear()}
-            />
-            <button
-              onClick={handleCrear}
-              disabled={saving || !nuevaEsp.trim()}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white transition disabled:opacity-40"
-              style={{ background: "var(--accent)" }}
-            >
-              Crear
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-y-auto flex-1 p-5 flex flex-col gap-4">
-          {/* Especialidades existentes */}
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-soft)] mb-2">
-              Tus especialidades · {especialidades.length}
-            </p>
-            {especialidades.length === 0 ? (
-              <p className="text-sm text-[var(--text-soft)] text-center py-4">
-                No hay especialidades creadas aún
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {especialidades.map((esp) => (
-                  <div
-                    key={esp.id_especialidad}
-                    className="flex items-center justify-between p-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg"
-                  >
-                    <div className="flex items-center gap-2">
-                      <IconBriefcase className="w-4 h-4 text-[var(--accent)]" />
-                      <span className="text-sm font-medium">{esp.nombre}</span>
-                    </div>
-                    <button
-                      onClick={() => handleEliminar(esp.id_especialidad)}
-                      className="text-[11px] text-red-500 hover:text-red-600 hover:bg-red-500/10 px-2 py-1 rounded-lg transition"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Sugerencias predefinidas */}
-          {predisponibles.length > 0 && (
+    <>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+      >
+        <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between p-5 border-b border-[var(--border)] flex-shrink-0">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-soft)] mb-2">
-                Sugerencias para {negocioTipo?.replace("_", " ")}
+              <h2 className="font-medium text-base">Gestionar especialidades</h2>
+              <p className="text-[11px] text-[var(--text-soft)] mt-0.5">
+                Seleccioná una especialidad para ver y gestionar sus servicios
               </p>
-              <div className="flex flex-wrap gap-2">
+            </div>
+            <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-[var(--bg-soft)] flex items-center justify-center text-[var(--text-soft)]">✕</button>
+          </div>
+
+          {/* Crear nueva especialidad */}
+          <div className="p-5 border-b border-[var(--border)] flex-shrink-0 flex flex-col gap-3">
+            <p className="text-xs font-medium text-[var(--text-soft)] uppercase tracking-wide">Crear nueva especialidad</p>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+                placeholder="Ej: Barbero Senior, Nutricionista Deportivo..."
+                value={nuevaEsp}
+                onChange={(e) => setNuevaEsp(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCrear()}
+              />
+              <button
+                onClick={handleCrear}
+                disabled={saving || !nuevaEsp.trim()}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition disabled:opacity-40"
+                style={{ background: "var(--accent)" }}
+              >
+                Crear
+              </button>
+            </div>
+            {/* Sugerencias predefinidas */}
+            {predisponibles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
                 {predisponibles.map((nombre) => (
                   <button
                     key={nombre}
                     onClick={() => handleCrearPredefinida(nombre)}
                     disabled={saving}
-                    className="px-3 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-lg text-xs text-[var(--accent)] hover:bg-[var(--accent)]/20 transition disabled:opacity-40"
+                    className="px-2.5 py-1 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-lg text-[11px] text-[var(--accent)] hover:bg-[var(--accent)]/20 transition disabled:opacity-40"
                   >
                     + {nombre}
                   </button>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Cuerpo: lista izq + servicios der */}
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            {/* Lista de especialidades */}
+            <div className="w-52 flex-shrink-0 border-r border-[var(--border)] overflow-y-auto p-3 flex flex-col gap-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-soft)] px-1 mb-1">
+                Especialidades · {especialidades.length}
+              </p>
+              {especialidades.length === 0 ? (
+                <p className="text-xs text-[var(--text-soft)] text-center py-4">Sin especialidades</p>
+              ) : (
+                especialidades.map((esp) => (
+                  <div key={esp.id_especialidad} className="group flex items-center gap-1">
+                    <button
+                      onClick={() => setTabActivo(tabActivo === esp.id_especialidad ? null : esp.id_especialidad)}
+                      className={[
+                        "flex-1 text-left px-2.5 py-2 rounded-lg text-xs transition truncate",
+                        tabActivo === esp.id_especialidad
+                          ? "bg-[var(--accent)]/15 text-[var(--accent)] font-medium"
+                          : "hover:bg-[var(--bg-soft)] text-[var(--text)]",
+                      ].join(" ")}
+                    >
+                      <IconBriefcase className="w-3 h-3 inline mr-1.5 opacity-60" />
+                      {esp.nombre}
+                    </button>
+                    <button
+                      onClick={() => handleEliminar(esp.id_especialidad)}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-red-500 hover:bg-red-500/10 transition text-[10px] flex-shrink-0"
+                      title="Eliminar"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
-          )}
+
+            {/* Panel de servicios */}
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+              {!tabActivo ? (
+                <div className="flex flex-col items-center justify-center h-full gap-2 text-center py-8">
+                  <div className="w-10 h-10 rounded-full bg-[var(--bg-soft)] border border-[var(--border)] flex items-center justify-center opacity-40">
+                    <IconBriefcase className="w-5 h-5" />
+                  </div>
+                  <p className="text-sm text-[var(--text-soft)]">Seleccioná una especialidad para ver sus servicios</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between flex-shrink-0">
+                    <div>
+                      <p className="text-sm font-medium">{espActiva?.nombre}</p>
+                      <p className="text-[11px] text-[var(--text-soft)]">
+                        {serviciosEsp.length} servicio{serviciosEsp.length !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => { setEditandoServicio(null); setServicioModalOpen(true); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white transition hover:opacity-90"
+                      style={{ background: "var(--accent)" }}
+                    >
+                      <span className="text-sm leading-none">+</span>
+                      Nuevo servicio
+                    </button>
+                  </div>
+
+                  {loadingServ ? (
+                    <p className="text-xs text-[var(--text-soft)] text-center py-4">Cargando...</p>
+                  ) : serviciosEsp.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 py-8 text-center">
+                      <span className="text-3xl opacity-20">🛠</span>
+                      <p className="text-sm text-[var(--text-soft)]">Sin servicios en esta especialidad</p>
+                      <button
+                        onClick={() => { setEditandoServicio(null); setServicioModalOpen(true); }}
+                        className="text-xs text-[var(--accent)] hover:underline"
+                      >
+                        Agregar el primero
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {serviciosEsp.map((s) => (
+                        <div
+                          key={s.id_servicio}
+                          className="flex items-center justify-between p-3 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg hover:border-[var(--accent)]/30 transition"
+                        >
+                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                              style={{ background: s.color_hex || "#888" }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{s.nombre}</p>
+                              <p className="text-[10px] text-[var(--text-soft)]">
+                                {s.duracion_min} min · ₡{Number(s.precio).toLocaleString("es-CR")}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {!s.activo && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-500/10 text-gray-400 border border-gray-400/20">
+                                Inactivo
+                              </span>
+                            )}
+                            <button
+                              onClick={() => { setEditandoServicio(s); setServicioModalOpen(true); }}
+                              className="px-2 py-1 rounded-lg text-[11px] border border-[var(--border)] hover:bg-[var(--bg)] transition"
+                            >
+                              Editar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Modal de servicio anidado */}
+      <ServicioModal
+        open={servicioModalOpen}
+        onClose={() => { setServicioModalOpen(false); setEditandoServicio(null); }}
+        onSave={handleCrearServicio}
+        onDelete={handleEliminarServicio}
+        inicial={editandoServicio || undefined}
+        loading={savingServ}
+        especialidades={especialidades}
+      />
+    </>
   );
 }
 
