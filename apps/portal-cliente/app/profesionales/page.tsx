@@ -103,6 +103,7 @@ export function profesionalAusenteEnFecha(
   fecha: Date | string
 ): boolean {
   const d = typeof fecha === "string" ? new Date(fecha) : fecha;
+
   return ausencias.some((a) => {
     const inicio = new Date(a.fecha_inicio);
     const fin = new Date(a.fecha_fin);
@@ -261,7 +262,17 @@ function AusenciasModal({
       toast.error("Completá las fechas de inicio y fin");
       return;
     }
-    if (new Date(form.fecha_fin) <= new Date(form.fecha_inicio)) {
+
+    // Validar que fecha_fin sea posterior a fecha_inicio
+    const inicio = form.todo_el_dia
+      ? new Date(form.fecha_inicio + "T00:00:00")
+      : new Date(form.fecha_inicio);
+
+    const fin = form.todo_el_dia
+      ? new Date(form.fecha_fin + "T23:59:59")
+      : new Date(form.fecha_fin);
+
+    if (fin <= inicio) {
       toast.error("La fecha fin debe ser posterior al inicio");
       return;
     }
@@ -281,30 +292,44 @@ function AusenciasModal({
                   ? "Injustificada"
                   : null;
 
+      // DESPUÉS — convertí a Date y luego a ISO con zona horaria correcta
+      const fechaInicioISO = form.todo_el_dia
+        ? new Date(`${form.fecha_inicio}T00:00:00`).toISOString()
+        : new Date(form.fecha_inicio.length === 16
+          ? `${form.fecha_inicio}:00`
+          : form.fecha_inicio
+        ).toISOString();
+
+      const fechaFinISO = form.todo_el_dia
+        ? new Date(`${form.fecha_fin}T23:59:59`).toISOString()
+        : new Date(form.fecha_fin.length === 16
+          ? `${form.fecha_fin}:00`
+          : form.fecha_fin
+        ).toISOString();
+
       const { error } = await supabase.from("bloqueos_profesional").insert([
         {
           id_bloqueo: genId("blq"),
           negocio_id: negocioId,
           id_profesional: profesional.id_profesional,
-          fecha_inicio: form.todo_el_dia
-            ? form.fecha_inicio + "T00:00:00"
-            : form.fecha_inicio.length === 16
-              ? form.fecha_inicio + ":00"
-              : form.fecha_inicio,
-          fecha_fin: form.todo_el_dia
-            ? form.fecha_fin + "T23:59:59"
-            : form.fecha_fin.length === 16
-              ? form.fecha_fin + ":00"
-              : form.fecha_fin,
+          fecha_inicio: fechaInicioISO,
+          fecha_fin: fechaFinISO,
           todo_el_dia: form.todo_el_dia,
           motivo: motivoFinal,
         },
       ]);
+
       if (error) throw error;
+
       toast.success("Ausencia registrada ✅");
       setForm({ fecha_inicio: "", fecha_fin: "", motivoTipo: "", motivoOtro: "", todo_el_dia: true });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event('refreshAusencias')); // trigger opcional
+      }
+
       loadAusencias();
-    } catch {
+    } catch (err) {
+      console.error("Error guardando ausencia:", err);
       toast.error("Error registrando ausencia ❌");
     } finally {
       setSavingAus(false);
@@ -322,16 +347,35 @@ function AusenciasModal({
     }
   };
 
-  const formatFecha = (iso: string) =>
-    new Date(iso).toLocaleDateString("es-CR", {
+  const formatFecha = (iso: string, todoElDia: boolean) => {
+    const fecha = new Date(iso);
+
+    if (todoElDia) {
+      return fecha.toLocaleDateString("es-CR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    }
+
+    return fecha.toLocaleString("es-CR", {
       day: "2-digit",
       month: "short",
       year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
+  };
 
   const now = new Date();
-  const vigentes = ausencias.filter((a) => new Date(a.fecha_fin) >= now);
-  const pasadas = ausencias.filter((a) => new Date(a.fecha_fin) < now);
+  const vigentes = ausencias.filter((a) => {
+    const fechaFin = new Date(a.fecha_fin);
+    return fechaFin >= now;
+  });
+  const pasadas = ausencias.filter((a) => {
+    const fechaFin = new Date(a.fecha_fin);
+    return fechaFin < now;
+  });
 
   if (!open) return null;
 
@@ -542,7 +586,7 @@ function AusenciaRow({
 }: {
   ausencia: Ausencia;
   onDelete: (id: string) => void;
-  formatFecha: (iso: string) => string;
+  formatFecha: (iso: string, todoElDia: boolean) => string;
   vigente: boolean;
 }) {
   const mismaFecha =
@@ -561,8 +605,8 @@ function AusenciaRow({
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
         <p className="text-xs font-medium leading-tight">
           {mismaFecha
-            ? formatFecha(ausencia.fecha_inicio)
-            : `${formatFecha(ausencia.fecha_inicio)} → ${formatFecha(ausencia.fecha_fin)}`}
+            ? formatFecha(ausencia.fecha_inicio, ausencia.todo_el_dia)
+            : `${formatFecha(ausencia.fecha_inicio, ausencia.todo_el_dia)} → ${formatFecha(ausencia.fecha_fin, ausencia.todo_el_dia)}`}
           {ausencia.todo_el_dia && (
             <span className="ml-1.5 text-[10px] text-[var(--text-soft)]">(todo el día)</span>
           )}
@@ -1442,6 +1486,7 @@ function EspecialidadesModal({
 function ProfesionalesPage() {
   const supabase = createClient();
   const { negocio } = useNegocio();
+  const [, forceUpdate] = useState(0);
 
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
@@ -1484,21 +1529,39 @@ function ProfesionalesPage() {
 
   const loadAusenciasVigentes = useCallback(async () => {
     if (!negocio?.id) return;
-    const ahora = new Date().toISOString();
-    const { data } = await supabase
+
+    console.log("🔄 Cargando ausencias vigentes...");
+
+    const { data, error } = await supabase
       .from("bloqueos_profesional")
-      .select("id_profesional")
-      .eq("negocio_id", negocio.id)
-      .gte("fecha_fin", ahora);
+      .select("id_profesional, fecha_inicio, fecha_fin, todo_el_dia")
+      .eq("negocio_id", negocio.id);
+
+    if (error) {
+      console.error("❌ Error al cargar ausencias vigentes:", error);
+      return;
+    }
+
     const counts: Record<string, number> = {};
-    (data || []).forEach((r: { id_profesional: string }) => {
-      counts[r.id_profesional] = (counts[r.id_profesional] || 0) + 1;
+    const now = new Date();
+
+    (data || []).forEach((a: any) => {
+      const inicio = new Date(a.fecha_inicio);
+      const fin = new Date(a.fecha_fin);
+
+      // Lógica más precisa (funciona tanto para todo el día como por horas)
+      if (inicio <= now && fin >= now) {
+        counts[a.id_profesional] = (counts[a.id_profesional] || 0) + 1;
+      }
     });
+
+    console.log("📊 Ausencias vigentes actualizadas:", counts);
     setAusenciasVigentes(counts);
   }, [negocio?.id]);
 
 
 
+  // ← Este useEffect ya lo tienes
   useEffect(() => {
     if (!negocio?.id) return;
     loadProfesionales();
@@ -1511,6 +1574,16 @@ function ProfesionalesPage() {
       .eq("activo", true)
       .then(({ data }) => setTurnos((data as Turno[]) || []));
   }, [negocio?.id, loadProfesionales, loadEspecialidades, loadAusenciasVigentes]);
+
+  // Listener para refrescar después de crear ausencia
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log("📡 Evento recibido, recargando...");
+      loadAusenciasVigentes();
+    };
+    window.addEventListener("refreshAusencias", handleRefresh);
+    return () => window.removeEventListener("refreshAusencias", handleRefresh);
+  }, [loadAusenciasVigentes]); // ← asegurate que tenga loadAusenciasVigentes en el array
 
   const handleSave = async (
     form: ProfesionalForm,
@@ -1782,8 +1855,6 @@ function ProfesionalesPage() {
               onEdit={(p) => {
                 setEditando(p);
                 setModalOpen(true);
-
-
               }}
               onAusencias={(p) => setAusenciasModal(p)}
               ausenciasCount={ausenciasVigentes[p.id_profesional] || 0}
@@ -1820,7 +1891,10 @@ function ProfesionalesPage() {
           open={!!ausenciasModal}
           onClose={() => {
             setAusenciasModal(null);
+            // Forzar recarga completa
             loadAusenciasVigentes();
+            // Opcional: recargar también los profesionales si es necesario
+            loadProfesionales();
           }}
           profesional={ausenciasModal}
           negocioId={negocio.id}
